@@ -1,0 +1,51 @@
+{
+    "name": "auto-expand-on-enter",
+    "displayName": "Auto Expand On Enter",
+    "description": "auto expand braces ex.'(),[],{}' when pressing enter",
+    "version": "0.0.1",
+    "publisher": "ctf0",
+    "repository": "https://github.com/ctf0/vscode-auto-expand-on-enter",
+    "engines": {
+        "vscode": "^1.41.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:type"
+    ],
+    "main": "./extension.js",
+    "contributes": {
+        "configuration": {
+            "title": "Auto Expand On Enter",
+            "properties": {
+                "auto-expand-on-enter.chars_list": {
+                    "type": "object",
+                    "default": {
+                        "(": ")",
+                        "[": "]",
+                        "{": "}"
+                    },
+                    "description": "single start & end chars list"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "test": "node ./test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/glob": "^7.1.1",
+        "@types/mocha": "^5.2.7",
+        "@types/node": "^12.11.7",
+        "@types/vscode": "^1.41.0",
+        "eslint": "^6.6.0",
+        "glob": "^7.1.5",
+        "mocha": "^6.2.2",
+        "typescript": "^3.6.4",
+        "vscode-test": "^1.2.2"
+    },
+    "dependencies": {
+        "lodash.debounce": "^4.0.8"
+    }
+}
