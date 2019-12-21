@@ -2,6 +2,7 @@ const vscode = require('vscode')
 let charsList = {}
 let cursorList = []
 const debounce = require('lodash.debounce')
+const escapeStringRegexp = require('escape-string-regexp')
 
 function activate() {
     readConfig()
@@ -46,22 +47,28 @@ function activate() {
                     }
                 }
             }
-        }, 300)
+        }, 50)
     )
 }
 
 async function doStuff(editor, doc, line) {
     let start = await doc.lineAt(line).text
-    let space = start.match(/([\s]+)/g) || ''
     let lastChar = start.trim().slice(-1)
-    let nextLine = await doc.lineAt(line + 1)
 
     if (hasBraces(lastChar)) {
+        let space = start.match(/^([\s]+)/g) || '' // get line indentation
+        let regex = escapeStringRegexp(charsList[lastChar]) // escape char if needed
+        let nextLine = await doc.lineAt(line + 1)
         let txt = nextLine.text
-        let fullRange = new vscode.Range(nextLine.range.start, nextLine.range.end)
 
         await editor.edit((edit) => {
-            edit.replace(fullRange, txt.replace(charsList[lastChar], (match) => '\n' + space + match))
+            edit.replace(
+                new vscode.Range(nextLine.range.start, nextLine.range.end),
+                txt.replace(
+                    new RegExp(`${regex}(?!.*${regex})`, 'g'), // get last occurrence
+                    (match) => ('\n' + space + match)
+                )
+            )
         })
     }
 }
