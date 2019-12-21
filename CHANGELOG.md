@@ -9,3 +9,8 @@
 - shorter debounce time
 - make sure to get last char on line not first match
 - better check for prev line indentation
+
+## 0.0.3
+
+- fix error of incorrect line value which happens on undo
+- correct brace count checking

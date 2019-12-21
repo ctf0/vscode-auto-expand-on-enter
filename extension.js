@@ -52,25 +52,55 @@ function activate() {
 }
 
 async function doStuff(editor, doc, line) {
-    let start = await doc.lineAt(line).text
-    let lastChar = start.trim().slice(-1)
+    if (line >= 0) {
+        let start = await doc.lineAt(line).text
+        let lastChar = start.trim().slice(-1)
+        let replacement = charsList[lastChar]
 
-    if (hasBraces(lastChar)) {
-        let space = start.match(/^([\s]+)/g) || '' // get line indentation
-        let regex = escapeStringRegexp(charsList[lastChar]) // escape char if needed
-        let nextLine = await doc.lineAt(line + 1)
-        let txt = nextLine.text
+        if (hasBraces(lastChar)) {
+            let space = start.match(/^([\s]+)/g) || '' // get line indentation
+            let regex = escapeStringRegexp(replacement) // escape char if needed
+            let nextLine = await doc.lineAt(line + 1)
+            let txt = nextLine.text
+            let moveBy = getCharDiff(txt, lastChar, regex)
+            let replaceDone = false
 
-        await editor.edit((edit) => {
-            edit.replace(
-                new vscode.Range(nextLine.range.start, nextLine.range.end),
-                txt.replace(
-                    new RegExp(`${regex}(?!.*${regex})`, 'g'), // get last occurrence
-                    (match) => ('\n' + space + match)
+            await editor.edit((edit) => {
+                edit.replace(
+                    new vscode.Range(nextLine.range.start, nextLine.range.end),
+                    txt.replace(new RegExp(regex, 'g'), (match) => {
+                        if (moveBy == 0 && !replaceDone) {
+                            replaceDone = true
+
+                            return '\n' + space + match
+                        } else {
+                            if (!replaceDone) {
+                                moveBy--
+                            }
+
+                            return match
+                        }
+                    })
                 )
-            )
-        })
+            })
+        }
     }
+}
+
+function getCharDiff(start, lastChar, replacement) {
+    let nextChar = 1
+    let nextReplacementChar = 0
+    let regex = new RegExp(escapeStringRegexp(lastChar) + '|' + replacement, 'g')
+
+    start.replace(regex, (match) => {
+        if (nextChar != nextReplacementChar) {
+            match == lastChar
+                ? nextChar++
+                : nextReplacementChar++
+        }
+    })
+
+    return nextChar > 0 ? nextChar - 1 : nextChar
 }
 
 function hasBraces(char) {
