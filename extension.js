@@ -1,3 +1,4 @@
+const { EOL } = require('os')
 const vscode = require('vscode')
 let charsList = {}
 let cursorList = []
@@ -34,7 +35,7 @@ function activate() {
                 let content = e.contentChanges
                 let lastChange = content[content.length - 1]
 
-                if (content.length && lastChange.text.startsWith('\n')) {
+                if (content.length && lastChange.text.startsWith(EOL)) {
                     if (cursorList.length > 1) {
                         for (let item of cursorList) {
                             let line = item.start.line - 1
