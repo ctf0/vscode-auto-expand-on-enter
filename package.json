@@ -2,7 +2,7 @@
     "name": "auto-expand-on-enter",
     "displayName": "Auto Expand On Enter",
     "description": "auto expand braces ex.'(),[],{}' when pressing enter",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "publisher": "ctf0",
     "repository": "https://github.com/ctf0/vscode-auto-expand-on-enter",
     "engines": {
@@ -27,6 +27,11 @@
                         "{": "}"
                     },
                     "description": "single start & end chars list"
+                },
+                "auto-expand-on-enter.delay": {
+                    "type": "number",
+                    "default": 50,
+                    "description": "multicursor recognize delay in ms"
                 }
             }
         }

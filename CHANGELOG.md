@@ -14,3 +14,7 @@
 
 - fix error of incorrect line value which happens on undo
 - correct brace count checking
+
+## 0.0.4
+
+- add delay to config

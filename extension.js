@@ -1,6 +1,7 @@
 const vscode = require('vscode')
 let charsList = {}
 let cursorList = []
+let delay = 0
 const debounce = require('lodash.debounce')
 const escapeStringRegexp = require('escape-string-regexp')
 
@@ -47,7 +48,7 @@ function activate() {
                     }
                 }
             }
-        }, 50)
+        }, delay)
     )
 }
 
@@ -112,7 +113,10 @@ function getConfig() {
 }
 
 function readConfig() {
-    charsList = getConfig().chars_list
+    let config = getConfig()
+
+    charsList = config.chars_list
+    delay = config.delay
 }
 
 exports.activate = activate
