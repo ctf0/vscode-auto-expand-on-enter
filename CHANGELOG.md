@@ -18,3 +18,7 @@
 ## 0.0.4
 
 - add delay to config
+
+## 0.0.6
+
+- fix cant find document is undefined

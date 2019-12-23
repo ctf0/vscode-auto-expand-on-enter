@@ -1,10 +1,8 @@
 const { EOL } = require('os')
 const vscode = require('vscode')
-let charsList = {}
-let cursorList = []
-let delay = 0
 const debounce = require('lodash.debounce')
 const escapeStringRegexp = require('escape-string-regexp')
+let config
 
 function activate() {
     readConfig()
@@ -15,41 +13,34 @@ function activate() {
         }
     })
 
-    vscode.window.onDidChangeTextEditorSelection((e) => {
-        cursorList = e.selections
-
-        cursorList.sort((a, b) => { // make sure its sorted correctly
-            if (a.start.line > b.start.line) return 1
-            if (b.start.line > a.start.line) return -1
-
-            return 0
-        }).reverse() // inverse so we can correctly track the active line
-    })
-
     vscode.workspace.onDidChangeTextDocument(
         debounce(async function (e) {
             let editor = vscode.window.activeTextEditor
-            let doc = editor.document
 
-            if (doc) {
-                let content = e.contentChanges
-                let lastChange = content[content.length - 1]
+            if (editor) {
+                let doc = editor.document
+                let selections = editor.selections
 
-                if (content.length && lastChange.text.startsWith(EOL)) {
-                    if (cursorList.length > 1) {
-                        for (let item of cursorList) {
-                            let line = item.start.line - 1
+                if (doc) {
+                    let content = e.contentChanges
+                    let lastChange = content[content.length - 1]
+
+                    if (content.length && lastChange.text.startsWith(EOL)) {
+                        if (selections.length > 1) {
+                            for (let item of invertSelections(selections)) {
+                                let line = item.start.line - 1
+
+                                await doStuff(editor, doc, line)
+                            }
+                        } else {
+                            let line = lastChange.range.start.line
 
                             await doStuff(editor, doc, line)
                         }
-                    } else {
-                        let line = lastChange.range.start.line
-
-                        await doStuff(editor, doc, line)
                     }
                 }
             }
-        }, delay)
+        }, config.delay)
     )
 }
 
@@ -57,10 +48,10 @@ async function doStuff(editor, doc, line) {
     if (line >= 0) {
         let start = await doc.lineAt(line).text
         let lastChar = start.trim().slice(-1)
-        let replacement = charsList[lastChar]
+        let replacement = config.chars_list[lastChar]
 
         if (hasBraces(lastChar)) {
-            let space = start.match(/^([\s]+)/g) || '' // get line indentation
+            let space = start.match(/^\s+/) || '' // get line indentation
             let regex = escapeStringRegexp(replacement) // escape char if needed
             let nextLine = await doc.lineAt(line + 1)
             let txt = nextLine.text
@@ -74,7 +65,7 @@ async function doStuff(editor, doc, line) {
                         if (moveBy == 0 && !replaceDone) {
                             replaceDone = true
 
-                            return '\n' + space + match
+                            return EOL + space + match
                         } else {
                             if (!replaceDone) {
                                 moveBy--
@@ -106,18 +97,21 @@ function getCharDiff(start, lastChar, replacement) {
 }
 
 function hasBraces(char) {
-    return Object.keys(charsList).some((e) => e == char)
-}
-
-function getConfig() {
-    return vscode.workspace.getConfiguration('auto-expand-on-enter')
+    return Object.keys(config.chars_list).some((e) => e == char)
 }
 
 function readConfig() {
-    let config = getConfig()
+    config = vscode.workspace.getConfiguration('auto-expand-on-enter')
+}
 
-    charsList = config.chars_list
-    delay = config.delay
+function invertSelections(arr) {
+    return arr.sort((a, b) => { // make sure its sorted correctly
+        if (a.start.line > b.start.line) return 1
+
+        if (b.start.line > a.start.line) return -1
+
+        return 0
+    }).reverse()
 }
 
 exports.activate = activate
