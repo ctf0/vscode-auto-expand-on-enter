@@ -21,7 +21,7 @@ function activate() {
                 let doc = editor.document
                 let selections = editor.selections
 
-                if (doc) {
+                if (doc && e.document == doc) {
                     let content = e.contentChanges
                     let lastChange = content[content.length - 1]
 
