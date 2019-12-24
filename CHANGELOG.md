@@ -22,3 +22,7 @@
 ## 0.0.6
 
 - fix cant find document is undefined
+
+## 0.0.7
+
+- fix double undo even when no braces were on the next line

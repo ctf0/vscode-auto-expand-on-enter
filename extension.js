@@ -55,27 +55,29 @@ async function doStuff(editor, doc, line) {
             let regex = escapeStringRegexp(replacement) // escape char if needed
             let nextLine = await doc.lineAt(line + 1)
             let txt = nextLine.text
-            let moveBy = getCharDiff(txt, lastChar, regex)
-            let replaceDone = false
+            if (txt.includes(replacement)) {
+                let moveBy = getCharDiff(txt, lastChar, regex)
+                let replaceDone = false
 
-            await editor.edit((edit) => {
-                edit.replace(
-                    new vscode.Range(nextLine.range.start, nextLine.range.end),
-                    txt.replace(new RegExp(regex, 'g'), (match) => {
-                        if (moveBy == 0 && !replaceDone) {
-                            replaceDone = true
+                await editor.edit((edit) => {
+                    edit.replace(
+                        new vscode.Range(nextLine.range.start, nextLine.range.end),
+                        txt.replace(new RegExp(regex, 'g'), (match) => {
+                            if (moveBy == 0 && !replaceDone) {
+                                replaceDone = true
 
-                            return EOL + space + match
-                        } else {
-                            if (!replaceDone) {
-                                moveBy--
+                                return EOL + space + match
+                            } else {
+                                if (!replaceDone) {
+                                    moveBy--
+                                }
+
+                                return match
                             }
-
-                            return match
-                        }
-                    })
-                )
-            })
+                        })
+                    )
+                })
+            }
         }
     }
 }
