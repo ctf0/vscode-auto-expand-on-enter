@@ -109,7 +109,6 @@ function readConfig() {
 function invertSelections(arr) {
     return arr.sort((a, b) => { // make sure its sorted correctly
         if (a.start.line > b.start.line) return 1
-
         if (b.start.line > a.start.line) return -1
 
         return 0
