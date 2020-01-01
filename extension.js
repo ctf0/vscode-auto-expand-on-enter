@@ -4,12 +4,12 @@ const debounce = require('lodash.debounce')
 const escapeStringRegexp = require('escape-string-regexp')
 let config
 
-function activate() {
-    readConfig()
+async function activate() {
+    await readConfig()
 
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
         if (e.affectsConfiguration('auto-expand-on-enter')) {
-            readConfig()
+            await readConfig()
         }
     })
 
@@ -66,7 +66,7 @@ async function doStuff(editor, doc, line) {
                             if (moveBy == 0 && !replaceDone) {
                                 replaceDone = true
 
-                                return EOL + space + match
+                                return `${EOL}${space}${match}`
                             } else {
                                 if (!replaceDone) {
                                     moveBy--
@@ -85,7 +85,7 @@ async function doStuff(editor, doc, line) {
 function getCharDiff(start, lastChar, replacement) {
     let nextChar = 1
     let nextReplacementChar = 0
-    let regex = new RegExp(escapeStringRegexp(lastChar) + '|' + replacement, 'g')
+    let regex = new RegExp(`${escapeStringRegexp(lastChar)}|${replacement}`, 'g')
 
     start.replace(regex, (match) => {
         if (nextChar != nextReplacementChar) {
@@ -99,11 +99,11 @@ function getCharDiff(start, lastChar, replacement) {
 }
 
 function hasBraces(char) {
-    return Object.keys(config.chars_list).some((e) => e == char)
+    return Object.keys(config.chars_list).includes(char)
 }
 
-function readConfig() {
-    config = vscode.workspace.getConfiguration('auto-expand-on-enter')
+async function readConfig() {
+    return config = await vscode.workspace.getConfiguration('auto-expand-on-enter')
 }
 
 function invertSelections(arr) {
