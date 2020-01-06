@@ -2,7 +2,9 @@ const { EOL } = require('os')
 const vscode = require('vscode')
 const debounce = require('lodash.debounce')
 const escapeStringRegexp = require('escape-string-regexp')
-let config
+
+let config = {}
+let escapedCharsList = null
 
 async function activate() {
     await readConfig()
@@ -18,24 +20,21 @@ async function activate() {
             let editor = vscode.window.activeTextEditor
 
             if (editor) {
-                let doc = editor.document
-                let selections = editor.selections
+                let { document, selections } = editor
 
-                if (doc && e.document == doc) {
+                if (document && e.document == document) {
                     let content = e.contentChanges
-                    let lastChange = content[content.length - 1]
 
-                    if (content.length && lastChange.text.startsWith(EOL)) {
-                        if (selections.length > 1) {
+                    if (content.length) {
+                        let lastChange = content[content.length - 1]
+                        let txt = lastChange.text
+
+                        if (txt.startsWith(EOL) || !txt) {
                             for (let item of invertSelections(selections)) {
-                                let line = item.start.line - 1
+                                let start = item.start.line
 
-                                await doStuff(editor, doc, line)
+                                await doStuff(editor, document, start == 0 ? start : start - 1)
                             }
-                        } else {
-                            let line = lastChange.range.start.line
-
-                            await doStuff(editor, doc, line)
                         }
                     }
                 }
@@ -45,65 +44,83 @@ async function activate() {
 }
 
 async function doStuff(editor, doc, line) {
-    if (line >= 0) {
-        let start = await doc.lineAt(line).text
-        let lastChar = start.trim().slice(-1)
+    let start = await doc.lineAt(line).text
+    let lastChar = start.trim().match(new RegExp(`(${escapedCharsList})$`, 'g'))
+
+    if (lastChar) {
+        lastChar = lastChar[0]
         let replacement = config.chars_list[lastChar]
 
-        if (hasBraces(lastChar)) {
-            let space = start.match(/^\s+/) || '' // get line indentation
-            let regex = escapeStringRegexp(replacement) // escape char if needed
+        if (replacement) {
+            let space = start.match(/^\s+/) // get line indentation
             let nextLine = await doc.lineAt(line + 1)
             let txt = nextLine.text
+
             if (txt.includes(replacement)) {
-                let moveBy = getCharDiff(txt, lastChar, regex)
+                replacement = escapeStringRegexp(replacement)
+                lastChar = escapeStringRegexp(lastChar)
+                let moveBy = await getCharDiff(txt, lastChar, replacement)
                 let replaceDone = false
 
-                await editor.edit((edit) => {
-                    edit.replace(
-                        new vscode.Range(nextLine.range.start, nextLine.range.end),
-                        txt.replace(new RegExp(regex, 'g'), (match) => {
-                            if (moveBy == 0 && !replaceDone) {
-                                replaceDone = true
+                await editor.edit(
+                    (edit) => {
+                        edit.replace(
+                            new vscode.Range(nextLine.range.start, nextLine.range.end),
+                            txt.replace(new RegExp(replacement, 'g'), (match) => {
+                                if (moveBy == 0 && !replaceDone) {
+                                    replaceDone = true
 
-                                return `${EOL}${space}${match}`
-                            } else {
-                                if (!replaceDone) {
-                                    moveBy--
+                                    return `${EOL}${space ? space[0] : ''}${match}`
+                                } else {
+                                    if (!replaceDone) {
+                                        moveBy--
+                                    }
+
+                                    return match
                                 }
-
-                                return match
-                            }
-                        })
-                    )
-                })
+                            })
+                        )
+                    },
+                    { undoStopBefore: false, undoStopAfter: false }
+                )
             }
         }
     }
+
 }
 
-function getCharDiff(start, lastChar, replacement) {
-    let nextChar = 1
-    let nextReplacementChar = 0
-    let regex = new RegExp(`${escapeStringRegexp(lastChar)}|${replacement}`, 'g')
+async function getCharDiff(start, lastChar, replacement) {
+    return new Promise((resolve) => {
+        let nextChar = 1
+        let nextReplacementChar = 0
+        let regex = `${lastChar}|${replacement}`
 
-    start.replace(regex, (match) => {
-        if (nextChar != nextReplacementChar) {
-            match == lastChar
-                ? nextChar++
-                : nextReplacementChar++
+        // support similar chars
+        // ex. `...`
+        if (lastChar == replacement) {
+            nextChar = 0
+            regex = replacement
         }
-    })
 
-    return nextChar > 0 ? nextChar - 1 : nextChar
+        start.replace(new RegExp(`${regex}`, 'g'), (match) => {
+            if (nextChar != nextReplacementChar) {
+                match == unRegex(lastChar)
+                    ? nextChar++
+                    : nextReplacementChar++
+            }
+        })
+
+        resolve(nextChar > 0 ? nextChar - 1 : nextChar)
+    })
 }
 
-function hasBraces(char) {
-    return Object.keys(config.chars_list).includes(char)
+function unRegex(str) {
+    return str.replace(/\\(.)/g, '$1')
 }
 
 async function readConfig() {
-    return config = await vscode.workspace.getConfiguration('auto-expand-on-enter')
+    config = await vscode.workspace.getConfiguration('auto-expand-on-enter')
+    escapedCharsList = Object.keys(config.chars_list).map((item) => escapeStringRegexp(item)).join('|')
 }
 
 function invertSelections(arr) {

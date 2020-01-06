@@ -26,3 +26,10 @@
 ## 0.0.7
 
 - fix double undo even when no braces were on the next line
+
+## 0.0.9
+
+- cleanup and small fixes
+- now undo is one step instead of multiple
+- support similar chars ex.back-ticks
+- support for any chars limit instead of single ones only ex.`/*`
