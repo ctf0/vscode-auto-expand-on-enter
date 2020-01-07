@@ -33,3 +33,7 @@
 - now undo is one step instead of multiple
 - support similar chars ex.back-ticks
 - support for any chars limit instead of single ones only ex.`/*`
+
+## 0.1.0
+
+- use command instead of relying on content change event

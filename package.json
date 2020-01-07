@@ -2,7 +2,7 @@
     "name": "auto-expand-on-enter",
     "displayName": "Auto Expand On Enter",
     "description": "auto expand braces ex.'(),[],{}' when pressing enter",
-    "version": "0.0.9",
+    "version": "0.1.0",
     "publisher": "ctf0",
     "repository": "https://github.com/ctf0/vscode-auto-expand-on-enter",
     "engines": {
@@ -12,10 +12,31 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:type"
+        "onCommand:autoExpand.newLine"
     ],
     "main": "./extension.js",
     "contributes": {
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "autoExpand.newLine",
+                    "when": "false"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "autoExpand.newLine",
+                "key": "enter",
+                "when": "editorTextFocus"
+            }
+        ],
+        "commands": [
+            {
+                "command": "autoExpand.newLine",
+                "title": "auto expand"
+            }
+        ],
         "configuration": {
             "title": "Auto Expand On Enter",
             "type": "object",
@@ -32,11 +53,6 @@
                         "`": "`"
                     },
                     "description": "single start & end chars list"
-                },
-                "auto-expand-on-enter.delay": {
-                    "type": "number",
-                    "default": 50,
-                    "description": "multicursor recognize delay in ms"
                 }
             }
         }
@@ -56,7 +72,6 @@
         "vscode-test": "^1.2.2"
     },
     "dependencies": {
-        "escape-string-regexp": "^2.0.0",
-        "lodash.debounce": "^4.0.8"
+        "escape-string-regexp": "^2.0.0"
     }
 }

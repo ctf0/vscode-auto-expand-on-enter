@@ -1,6 +1,5 @@
 const { EOL } = require('os')
 const vscode = require('vscode')
-const debounce = require('lodash.debounce')
 const escapeStringRegexp = require('escape-string-regexp')
 
 let config = {}
@@ -15,32 +14,20 @@ async function activate() {
         }
     })
 
-    vscode.workspace.onDidChangeTextDocument(
-        debounce(async function (e) {
-            let editor = vscode.window.activeTextEditor
+    vscode.commands.registerCommand('autoExpand.newLine', async () => {
+        let editor = vscode.window.activeTextEditor
 
-            if (editor) {
-                let { document, selections } = editor
+        if (editor) {
+            await vscode.commands.executeCommand('type', { text: EOL })
+            let { document, selections } = editor
+            for (let item of invertSelections(selections)) {
+                let start = item.start.line
 
-                if (document && e.document == document) {
-                    let content = e.contentChanges
-
-                    if (content.length) {
-                        let lastChange = content[content.length - 1]
-                        let txt = lastChange.text
-
-                        if (txt.startsWith(EOL) || !txt) {
-                            for (let item of invertSelections(selections)) {
-                                let start = item.start.line
-
-                                await doStuff(editor, document, start == 0 ? start : start - 1)
-                            }
-                        }
-                    }
-                }
+                await doStuff(editor, document, start == 0 ? start : start - 1)
             }
-        }, config.delay)
-    )
+        }
+    })
+
 }
 
 async function doStuff(editor, doc, line) {
@@ -86,7 +73,6 @@ async function doStuff(editor, doc, line) {
             }
         }
     }
-
 }
 
 async function getCharDiff(start, lastChar, replacement) {
