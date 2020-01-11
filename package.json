@@ -28,7 +28,7 @@
             {
                 "command": "autoExpand.newLine",
                 "key": "enter",
-                "when": "editorTextFocus"
+                "when": "editorTextFocus && !suggestWidgetVisible"
             }
         ],
         "commands": [
@@ -50,7 +50,8 @@
                         "/*": "*/",
                         "{{--": "--}}",
                         "<!--": "-->",
-                        "`": "`"
+                        "`": "`",
+                        ">": "</"
                     },
                     "description": "single start & end chars list"
                 }
