@@ -18,7 +18,7 @@ async function activate() {
         let editor = vscode.window.activeTextEditor
 
         if (editor) {
-            await vscode.commands.executeCommand('type', { text: EOL })
+            await vscode.commands.executeCommand('default:type', { text: EOL })
             let { document, selections } = editor
             for (let item of invertSelections(selections)) {
                 let start = item.start.line
