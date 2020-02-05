@@ -2,7 +2,7 @@
     "name": "auto-expand-on-enter",
     "displayName": "Auto Expand On Enter",
     "description": "auto expand braces ex.'(),[],{}' when pressing enter",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "publisher": "ctf0",
     "repository": "https://github.com/ctf0/vscode-auto-expand-on-enter",
     "engines": {
@@ -12,10 +12,21 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:autoExpand.newLine"
+        "onCommand:autoExpand.newLine",
+        "onCommand:autoExpand.content"
     ],
     "main": "./extension.js",
     "contributes": {
+        "commands": [
+            {
+                "command": "autoExpand.newLine",
+                "title": "Auto Expand"
+            },
+            {
+                "command": "autoExpand.content",
+                "title": "Auto Expand: Content"
+            }
+        ],
         "menus": {
             "commandPalette": [
                 {
@@ -28,32 +39,26 @@
             {
                 "command": "autoExpand.newLine",
                 "key": "enter",
-                "when": "editorTextFocus && !suggestWidgetVisible"
-            }
-        ],
-        "commands": [
+                "when": "editorTextFocus && !suggestWidgetVisible && !editorHasSelection"
+            },
             {
-                "command": "autoExpand.newLine",
-                "title": "auto expand"
+                "command": "autoExpand.content",
+                "mac": "alt+cmd+.",
+                "when": "editorIsOpen && !editorReadonly"
             }
         ],
         "configuration": {
             "title": "Auto Expand On Enter",
             "type": "object",
             "properties": {
-                "auto-expand-on-enter.chars_list": {
+                "auto-expand-on-enter.list": {
                     "type": "object",
                     "default": {
                         "(": ")",
-                        "[": "]",
                         "{": "}",
-                        "/*": "*/",
-                        "{{--": "--}}",
-                        "<!--": "-->",
-                        "`": "`",
-                        ">": "</"
+                        "[": "]"
                     },
-                    "description": "single start & end chars list"
+                    "description": "start & end chars list"
                 }
             }
         }

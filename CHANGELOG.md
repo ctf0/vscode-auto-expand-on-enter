@@ -37,3 +37,9 @@
 ## 0.1.0
 
 - use command instead of relying on content change event
+
+## 0.1.2
+
+- its now working on full scope as expected
+- support both ends
+- expand contents
