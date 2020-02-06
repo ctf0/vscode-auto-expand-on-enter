@@ -17,4 +17,4 @@
 
 ### Notes
 
-- expanding both braces & html tags at the same time wont work, as expanding braces have will take over
+- expanding both braces & html tags at the same time wont work, as expanding braces will take over

@@ -43,3 +43,8 @@
 - its now working on full scope as expected
 - support both ends
 - expand contents
+
+## 0.1.4
+
+- fix reseting multi selections
+- fix expanding even when at the EOL in html based langs

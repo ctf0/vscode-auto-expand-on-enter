@@ -86,7 +86,10 @@ async function expandNewLine() {
         }
 
         await addNewLine()
-        editor.selections = editor.selections.filter((value, index) => !(index % 2))
+
+        if (arr.length) {
+            editor.selections = editor.selections.filter((value, index) => !(index % 2))
+        }
     }
 }
 
@@ -114,6 +117,7 @@ async function forHtml(editor, selections) {
 function checkForHtmlTag(document, end) {
     let { line, character } = end
 
+    let endOfLine = document.lineAt(line).text.length == character
     let before = getChar(document, new vscode.Range(line, 0, line, character), />(\s+)?$/)
     let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^(\s+)?<\//)
 
@@ -121,7 +125,10 @@ function checkForHtmlTag(document, end) {
     let aTrim = after.trim()
 
     // do nothing
-    if (bTrim && bTrim.endsWith('>') && aTrim && aTrim.startsWith('</')) {
+    if (
+        (bTrim && bTrim.endsWith('>') && aTrim && aTrim.startsWith('</')) ||
+        (bTrim && endOfLine)
+    ) {
         return false
     }
 
