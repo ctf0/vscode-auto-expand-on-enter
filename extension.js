@@ -38,11 +38,14 @@ async function expandContent() {
                 let space = match ? match.join('') : ''
 
                 txt = txt
-                    .replace(new RegExp(/\)\./g), `)${EOL}${space}.`)
-                    .replace(new RegExp(/(?<=\S)(\s+)?,(\s+)?\S/g), (match) => {
+                    .replace(new RegExp(/\)\./g), `)${EOL}${space}.`) // ).
+                    .replace(new RegExp(/\)->/g), `)${EOL}${space}->`) // )->
+                    .replace(new RegExp(/((?<=\S)(\s+)?,(\s+)?\S)|((?<=['"])(\s+)?,(\s+)?['"])/g), (match) => { // ',' or w,w
                         return match.replace(/,\s+/, `,${EOL}${space}`)
-                    }).replace(new RegExp(/(?<=['"])(\s+)?,(\s+)?['"]/g), (match) => {
-                        return match.replace(/,\s+/, `,${EOL}${space}`)
+                    }).replace(new RegExp(/(\s+)?(((?<!\?)\?(?![?:]))|((?<![?:]):(?![:])))/g), (match) => { // ? ... : ...
+                        match = match.replace(/\s+/, '')
+
+                        return `${EOL}${space}${match}`
                     })
 
                 await editor.edit(

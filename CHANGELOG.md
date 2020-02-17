@@ -48,3 +48,9 @@
 
 - fix reseting multi selections
 - fix expanding even when at the EOL in html based langs
+
+## 0.1.5
+
+- more patterns for expand content ex.
+    - `)->`
+    - `... ? ... : ...`

@@ -11,8 +11,8 @@
         > <sub>EOL == end of line</sub><br>
         > <sub>ES == empty spaces</sub><br>
 
-- expand method chains
-- expand arguments, array items
+- expand method chains ex.`).` & `)->`
+- expand arguments, array items ex.`','` & `...,...`
 - expand html tags "using emmet `balanceOut` command"
 
 ### Notes
