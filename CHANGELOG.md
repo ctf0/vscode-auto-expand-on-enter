@@ -54,3 +54,7 @@
 - more patterns for expand content ex.
     - `)->`
     - `... ? ... : ...`
+
+## 0.1.6
+
+- change "auto-expand-on-enter.htmlBasedLangs" to an array

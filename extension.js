@@ -1,5 +1,5 @@
 const vscode = require('vscode')
-const { EOL } = require('os')
+const {EOL} = require('os')
 const escapeStringRegexp = require('escape-string-regexp')
 let config = {}
 let charsList = {}
@@ -27,11 +27,11 @@ async function expandContent() {
     let editor = vscode.window.activeTextEditor
 
     if (editor) {
-        let { document, selections } = editor
+        let {document, selections} = editor
 
         for (const selection of invertSelections(selections)) {
             if (selection.isSingleLine) {
-                let { start } = selection
+                let {start} = selection
                 let txt = document.lineAt(start.line).text
                 let length = txt.length
                 let match = txt.match(/^\s+/)
@@ -50,7 +50,7 @@ async function expandContent() {
 
                 await editor.edit(
                     (edit) => edit.replace(new vscode.Range(start.line, 0, start.line, length), txt),
-                    { undoStopBefore: false, undoStopAfter: false }
+                    {undoStopBefore: false, undoStopAfter: false}
                 )
             }
         }
@@ -63,8 +63,8 @@ async function expandNewLine() {
     let editor = vscode.window.activeTextEditor
 
     if (editor) {
-        let { selections, document } = editor
-        let { languageId } = document
+        let {selections, document} = editor
+        let {languageId} = document
         let arr = []
         selections = invertSelections(selections)
 
@@ -98,14 +98,14 @@ async function expandNewLine() {
 
 /* Html --------------------------------------------------------------------- */
 async function forHtml(editor, selections) {
-    let { document } = editor
+    let {document} = editor
     let arr = []
 
     if (selections.some((selection) => checkForHtmlTag(document, selection.end))) {
         await vscode.commands.executeCommand('editor.emmet.action.balanceOut')
 
         for (const selection of vscode.window.activeTextEditor.selections) {
-            let { start, end } = selection
+            let {start, end} = selection
 
             arr.push(...[
                 new vscode.Selection(start, start),
@@ -118,7 +118,7 @@ async function forHtml(editor, selections) {
 }
 
 function checkForHtmlTag(document, end) {
-    let { line, character } = end
+    let {line, character} = end
 
     let endOfLine = document.lineAt(line).text.length == character
     let before = getChar(document, new vscode.Range(line, 0, line, character), />(\s+)?$/)
@@ -129,8 +129,9 @@ function checkForHtmlTag(document, end) {
 
     // do nothing
     if (
-        (bTrim && bTrim.endsWith('>') && aTrim && aTrim.startsWith('</')) ||
-        (bTrim && endOfLine)
+        (bTrim && bTrim.endsWith('>') && aTrim && aTrim.startsWith('</')) || // ></
+        (bTrim && endOfLine) ||
+        (bTrim && bTrim.endsWith('/>') && aTrim && aTrim.startsWith('<')) // /><
     ) {
         return false
     }
@@ -148,8 +149,8 @@ function checkForHtmlTag(document, end) {
 
 /* Normal ------------------------------------------------------------------- */
 async function createSelections(editor, selection) {
-    let { end } = selection
-    let { document } = editor
+    let {end} = selection
+    let {document} = editor
     let result = getCharResult(document, end)
 
     if (!result.hasOwnProperty('char')) {
@@ -157,7 +158,7 @@ async function createSelections(editor, selection) {
     }
 
     // get open & close chars
-    let { char, direction, before, after } = result
+    let {char, direction, before, after} = result
     let counter = charsList[char.trim()] || open.find((k) => charsList[k] === char.trim())
     let isRight = direction != 'toLeft'
     counter = isRight
@@ -177,7 +178,7 @@ function resolveCounter(char) {
 }
 
 function getText(isRight, document, end, len) {
-    let { line, character } = end
+    let {line, character} = end
 
     return isRight
         ? document.getText(document.validateRange(new vscode.Range(line, character - len, document.lineCount + 1, 0)))
@@ -261,7 +262,7 @@ function getChar(document, range, regex) {
 
 function getCharResult(document, end) {
     let result = {}
-    let { line, character } = end
+    let {line, character} = end
 
     let before = getChar(document, new vscode.Range(line, 0, line, character), /(\S(\s+)?)$/)
     let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^((\s+)?\S)/)
@@ -309,7 +310,7 @@ function invertSelections(arr) {
 }
 
 async function addNewLine() {
-    return vscode.commands.executeCommand('default:type', { text: EOL })
+    return vscode.commands.executeCommand('default:type', {text: EOL})
 }
 
 /* Config ------------------------------------------------------------------- */
