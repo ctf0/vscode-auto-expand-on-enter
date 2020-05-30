@@ -40,13 +40,17 @@ async function expandContent() {
                 txt = txt
                     .replace(new RegExp(/\)\./g), `)${EOL}${space}.`) // ).
                     .replace(new RegExp(/\)->/g), `)${EOL}${space}->`) // )->
+                    .replace(new RegExp(/(\s+)?(\&{2,}|\|{2,})/g), (match) => `${match}${EOL}${space}`) // && , ||
                     .replace(new RegExp(/((?<=\S)(\s+)?,(\s+)?\S)|((?<=['"])(\s+)?,(\s+)?['"])/g), (match) => { // ',' or w,w
                         return match.replace(/,\s+/, `,${EOL}${space}`)
-                    }).replace(new RegExp(/(\s+)?(((?<!\?)\?(?![?:]))|((?<![?:]):(?![:])))/g), (match) => { // ? ... : ...
-                        match = match.replace(/\s+/, '')
-
-                        return `${EOL}${space}${match}`
                     })
+
+                // TODO: have to check if line has "? & :" other wise it will expand objects too
+                // .replace(new RegExp(/(\s+)?(((?<!\?)\?(?![?:]))|((?<![?:]):(?![:])))/g), (match) => { // ? ... : ...
+                //     match = match.replace(/\s+/, '')
+
+                //     return `${EOL}${space}${match}`
+                // })
 
                 await editor.edit(
                     (edit) => edit.replace(new vscode.Range(start.line, 0, start.line, length), txt),

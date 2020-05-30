@@ -12,7 +12,6 @@
         > <sub>ES == empty spaces</sub><br>
 
 - expand method chains ex.`).` & `)->`
-- expand ternary operator ex.`... ? ... : ...`
 - expand arguments, array items ex.`','` & `...,...`
 - expand html tags "using emmet `balanceOut` command"
 

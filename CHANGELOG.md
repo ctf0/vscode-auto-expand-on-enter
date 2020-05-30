@@ -58,3 +58,8 @@
 ## 0.1.6
 
 - change "auto-expand-on-enter.htmlBasedLangs" to an array
+
+## 0.1.7
+
+- stop ternary operator expand as it needs more work
+- add support for `&&` & `||`
