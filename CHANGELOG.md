@@ -63,3 +63,7 @@
 
 - stop ternary operator expand as it needs more work
 - add support for `&&` & `||`
+
+## 0.1.8
+
+- fix incorrect expand for html ex.`/><`

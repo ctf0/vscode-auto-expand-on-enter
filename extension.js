@@ -1,6 +1,7 @@
 const vscode = require('vscode')
 const {EOL} = require('os')
 const escapeStringRegexp = require('escape-string-regexp')
+
 let config = {}
 let charsList = {}
 let open = []
@@ -70,6 +71,7 @@ async function expandNewLine() {
         let {selections, document} = editor
         let {languageId} = document
         let arr = []
+        let html = false
         selections = invertSelections(selections)
 
         for (let selection of selections) {
@@ -86,6 +88,7 @@ async function expandNewLine() {
             let res = await forHtml(editor, selections)
 
             if (res.length) {
+                html = true
                 arr.push(...res)
             }
 
@@ -94,7 +97,7 @@ async function expandNewLine() {
 
         await addNewLine()
 
-        if (arr.length) {
+        if (arr.length && html) {
             editor.selections = editor.selections.filter((value, index) => !(index % 2))
         }
     }
@@ -125,8 +128,8 @@ function checkForHtmlTag(document, end) {
     let {line, character} = end
 
     let endOfLine = document.lineAt(line).text.length == character
-    let before = getChar(document, new vscode.Range(line, 0, line, character), />(\s+)?$/)
-    let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^(\s+)?<\//)
+    let before = getChar(document, new vscode.Range(line, 0, line, character), /(\/)?>(\s+)?$/)
+    let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^(\s+)?<(\/)?/)
 
     let bTrim = before.trim()
     let aTrim = after.trim()
@@ -282,7 +285,7 @@ function getCharResult(document, end) {
 
     return Object.assign(result, {
         before: before,
-        after: after
+        after : after
     })
 }
 
@@ -295,7 +298,7 @@ function isSupported(toCompare, toUse) {
 
     if (res) {
         return {
-            char: toUse,
+            char     : toUse,
             direction: res
         }
     }
