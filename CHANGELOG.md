@@ -67,3 +67,7 @@
 ## 0.1.8
 
 - fix incorrect expand for html ex.`/><`
+
+## 0.1.9
+
+- fix haveing multiple cursors for single expand

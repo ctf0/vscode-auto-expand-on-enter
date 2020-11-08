@@ -97,7 +97,7 @@ async function expandNewLine() {
 
         await addNewLine()
 
-        if (arr.length && html) {
+        if (arr.length && (html || arr.length < 3)) { // for html & single selection only
             editor.selections = editor.selections.filter((value, index) => !(index % 2))
         }
     }
