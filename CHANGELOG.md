@@ -71,3 +71,7 @@
 ## 0.1.9
 
 - fix haveing multiple cursors for single expand
+
+## 0.2.0
+
+- fix package settings name

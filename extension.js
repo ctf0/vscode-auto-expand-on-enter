@@ -1,6 +1,7 @@
 const vscode = require('vscode')
 const {EOL} = require('os')
 const escapeStringRegexp = require('escape-string-regexp')
+const PACKAGE_NAME = 'autoExpandOnEnter'
 
 let config = {}
 let charsList = {}
@@ -12,7 +13,7 @@ async function activate(context) {
 
     // config
     vscode.workspace.onDidChangeConfiguration(async (e) => {
-        if (e.affectsConfiguration('auto-expand-on-enter')) {
+        if (e.affectsConfiguration(PACKAGE_NAME)) {
             await readConfig()
         }
     })
@@ -35,20 +36,19 @@ async function expandContent() {
                 let {start} = selection
                 let txt = document.lineAt(start.line).text
                 let length = txt.length
-                let match = txt.match(/^\s+/)
+                let match = txt.match(/^[\t ]+/)
                 let space = match ? match.join('') : ''
 
                 txt = txt
-                    .replace(new RegExp(/\)\./g), `)${EOL}${space}.`) // ).
-                    .replace(new RegExp(/\)->/g), `)${EOL}${space}->`) // )->
-                    .replace(new RegExp(/(\s+)?(\&{2,}|\|{2,})/g), (match) => `${match}${EOL}${space}`) // && , ||
-                    .replace(new RegExp(/((?<=\S)(\s+)?,(\s+)?\S)|((?<=['"])(\s+)?,(\s+)?['"])/g), (match) => { // ',' or w,w
-                        return match.replace(/,\s+/, `,${EOL}${space}`)
+                    .replace(new RegExp(/\)(\.|->)/g), `)${EOL}${space}$1`) // )'.| ->'
+                    .replace(new RegExp(/([\t ]+)?(\&{2,}|\|{2,})/g), (match) => `${match}${EOL}${space}`) // && , ||
+                    .replace(new RegExp(/(?<=['"\S])([\t ]+)?,([\t ]+)?['"\S$]/g), (match) => { // ',' or w,w
+                        return match.replace(/,[\t ]+/, `,${EOL}${space}`)
                     })
 
                 // TODO: have to check if line has "? & :" other wise it will expand objects too
-                // .replace(new RegExp(/(\s+)?(((?<!\?)\?(?![?:]))|((?<![?:]):(?![:])))/g), (match) => { // ? ... : ...
-                //     match = match.replace(/\s+/, '')
+                // .replace(new RegExp(/([\t ]+)?(((?<!\?)\?(?![?:]))|((?<![?:]):(?![:])))/g), (match) => { // ? ... : ...
+                //     match = match.replace(/[\t ]+/, '')
 
                 //     return `${EOL}${space}${match}`
                 // })
@@ -128,8 +128,8 @@ function checkForHtmlTag(document, end) {
     let {line, character} = end
 
     let endOfLine = document.lineAt(line).text.length == character
-    let before = getChar(document, new vscode.Range(line, 0, line, character), /(\/)?>(\s+)?$/)
-    let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^(\s+)?<(\/)?/)
+    let before = getChar(document, new vscode.Range(line, 0, line, character), /(\/)?>([\t ]+)?$/)
+    let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^([\t ]+)?<(\/)?/)
 
     let bTrim = before.trim()
     let aTrim = after.trim()
@@ -179,7 +179,7 @@ async function createSelections(editor, selection) {
 }
 
 function resolveCounter(char) {
-    let match = char.match(/\s+/)
+    let match = char.match(/[\t ]+/)
 
     return match ? match.join('') : ''
 }
@@ -271,8 +271,8 @@ function getCharResult(document, end) {
     let result = {}
     let {line, character} = end
 
-    let before = getChar(document, new vscode.Range(line, 0, line, character), /(\S(\s+)?)$/)
-    let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^((\s+)?\S)/)
+    let before = getChar(document, new vscode.Range(line, 0, line, character), /(\S([\t ]+)?)$/)
+    let after = getChar(document, new vscode.Range(line, character, line, document.lineAt(line).text.length), /^(([\t ]+)?\S)/)
 
     let bTrim = before.trim()
     let aTrim = after.trim()
@@ -284,8 +284,8 @@ function getCharResult(document, end) {
     }
 
     return Object.assign(result, {
-        before: before,
-        after : after
+        before : before,
+        after  : after
     })
 }
 
@@ -298,8 +298,8 @@ function isSupported(toCompare, toUse) {
 
     if (res) {
         return {
-            char     : toUse,
-            direction: res
+            char      : toUse,
+            direction : res
         }
     }
 
@@ -322,7 +322,7 @@ async function addNewLine() {
 
 /* Config ------------------------------------------------------------------- */
 async function readConfig() {
-    config = await vscode.workspace.getConfiguration('auto-expand-on-enter')
+    config = await vscode.workspace.getConfiguration(PACKAGE_NAME)
 
     charsList = config.list
     open = Object.keys(charsList)
