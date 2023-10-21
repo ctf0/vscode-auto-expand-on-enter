@@ -68,39 +68,41 @@ async function expandContent() {
 async function expandNewLine() {
     const editor = vscode.window.activeTextEditor;
 
-    if (editor) {
-        let { selections, document } = editor;
-        const { languageId } = document;
-        const arr = [];
-        let html = false;
-        selections = invertSelections(selections);
+    if (!editor) {
+        return;
+    }
 
-        for (const selection of selections) {
-            const res = await createSelections(editor, selection);
+    let { selections, document } = editor;
+    const { languageId } = document;
+    const arr = [];
+    let html = false;
+    selections = invertSelections(selections);
 
-            if (res) {
-                arr.push(...res);
-            }
+    for (const selection of selections) {
+        const res = await createSelections(editor, selection);
+
+        if (res) {
+            arr.push(...res);
+        }
+    }
+
+    if (arr.length) {
+        editor.selections = arr;
+    } else if (config.htmlBasedLangs.includes(languageId)) {
+        const res = await forHtml(editor, selections);
+
+        if (res.length) {
+            html = true;
+            arr.push(...res);
         }
 
-        if (arr.length) {
-            editor.selections = arr;
-        } else if (config.htmlBasedLangs.includes(languageId)) {
-            const res = await forHtml(editor, selections);
+        editor.selections = arr;
+    }
 
-            if (res.length) {
-                html = true;
-                arr.push(...res);
-            }
+    await vscode.commands.executeCommand('default:type', { text: EOL });
 
-            editor.selections = arr;
-        }
-
-        await addNewLine();
-
-        if (arr.length && (html || arr.length < 3)) { // for html & single selection only
-            editor.selections = editor.selections.filter((value, index) => !(index % 2));
-        }
+    if (arr.length && (html || arr.length < 3)) { // for html & single selection only
+        editor.selections = editor.selections.filter((value, index) => !(index % 2));
     }
 }
 
@@ -284,10 +286,7 @@ function getCharResult(document, end) {
         result = isSupported(bTrim, before);
     }
 
-    return Object.assign(result, {
-        before : before,
-        after  : after,
-    });
+    return Object.assign(result, { before, after });
 }
 
 function isSupported(toCompare, toUse) {
@@ -316,10 +315,6 @@ function invertSelections(arr) {
 
         return 0;
     }).reverse();
-}
-
-async function addNewLine() {
-    return vscode.commands.executeCommand('default:type', { text: EOL });
 }
 
 /* Config ------------------------------------------------------------------- */
