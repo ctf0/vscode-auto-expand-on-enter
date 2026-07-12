@@ -13,8 +13,4 @@
 
 - expand method chains ex.`).` & `)->`
 - expand arguments, array items ex.`','` & `...,...`
-- expand html tags "using emmet `balanceOut` command"
 
-### Notes
-
-- expanding both braces & html tags at the same time wont work, as expanding braces will take over

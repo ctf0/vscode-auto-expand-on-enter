@@ -2,11 +2,11 @@
     "name": "auto-expand-on-enter",
     "displayName": "Auto Expand On Enter",
     "description": "auto expand braces ex.'(),[],{}' when pressing enter",
-    "version": "0.2.2",
+    "version": "0.2.5",
     "publisher": "ctf0",
     "repository": "https://github.com/ctf0/vscode-auto-expand-on-enter",
     "engines": {
-        "vscode": "^1.85.0"
+        "vscode": "^1.110.0"
     },
     "categories": [
         "Other"
@@ -60,17 +60,15 @@
                     },
                     "description": "start & end chars list"
                 },
-                "autoExpandOnEnter.htmlBasedLangs": {
+                "autoExpandOnEnter.languages": {
                     "type": "array",
                     "default": [
-                        "html",
-                        "vue",
-                        "blade"
+                        "php"
                     ],
                     "items": {
                         "type": "string"
                     },
-                    "markdownDescription": "languages/syntax that have tags (uses `#emmet.includeLanguages#` to get tag content), set it to empty array to disable it"
+                    "description": "languages to expand"
                 }
             }
         }
@@ -83,9 +81,9 @@
         "watch": "npm run esbuild"
     },
     "devDependencies": {
-        "@types/vscode": "^1.85.0",
-        "typescript": "^5.7.3",
-        "esbuild": "^0.25.0"
+        "@types/vscode": "^1.110.0",
+        "typescript": "^7.0.2",
+        "esbuild": "^0.28.1"
     },
     "dependencies": {
         "escape-string-regexp": "^5.0.0"
