@@ -68,30 +68,34 @@ async function expandContent() {
 async function expandNewLine() {
     const editor = vscode.window.activeTextEditor
 
-    if (!editor || !languages.includes(editor.document.languageId)) {
+    if (!editor) {
         return
     }
 
     let {selections} = editor
     const arr = []
-    selections = invertSelections(selections)
+    const isSupported = languages.includes(editor.document.languageId)
 
-    for (const selection of selections) {
-        const res = await createSelections(editor, selection)
+    if (isSupported) {
+        selections = invertSelections(selections)
 
-        if (res) {
-            arr.push(...res)
+        for (const selection of selections) {
+            const res = await createSelections(editor, selection)
+
+            if (res) {
+                arr.push(...res)
+            }
         }
-    }
 
-    if (arr.length) {
-        editor.selections = arr
+        if (arr.length) {
+            editor.selections = arr
+        }
     }
 
     await vscode.commands.executeCommand('default:type', {text: EOL})
 
-    if (arr.length && (arr.length < 3)) { // for & single selection only
-        editor.selections = editor.selections.filter((value, index) => !(index % 2))
+    if (arr.length && arr.length < 3 && isSupported) { // for & single selection only
+        editor.selections = editor.selections.filter((_, index) => !(index % 2))
     }
 }
 
