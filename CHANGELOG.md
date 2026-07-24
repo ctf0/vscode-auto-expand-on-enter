@@ -75,3 +75,7 @@
 ## 0.2.0
 
 - fix package settings name
+
+## 0.2.7
+
+- much better expantion logic
