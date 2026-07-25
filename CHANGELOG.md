@@ -79,3 +79,7 @@
 ## 0.2.7
 
 - much better expantion logic
+
+## 0.2.8
+
+- fixs

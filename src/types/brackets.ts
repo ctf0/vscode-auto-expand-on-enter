@@ -29,6 +29,10 @@ export async function createBracketSelections(editor, selection, charsList, open
 
     const positions = getPositions(isRight, document, end, offset, isRight ? char.length : openChar.length, before, after)
 
+    if (positions.length < 2 || !hasContentAroundPair(document, end, char, openChar, closeChar, positions, isRight)) {
+        return false
+    }
+
     // when the bracket pair is <>, the close char > belongs to an HTML tag
     // — attach the opening tag's first-line indent so the edit loop can use it
     if (openChar === '>' && closeChar === '<') {
@@ -39,6 +43,21 @@ export async function createBracketSelections(editor, selection, charsList, open
     }
 
     return positions
+}
+
+function hasContentAroundPair(document, end, char, openChar, closeChar, positions, isRight) {
+    const openOffset = isRight
+        ? document.offsetAt(end) - char.length
+        : document.offsetAt(positions[1].start) - openChar.length
+    const closeOffset = isRight
+        ? document.offsetAt(positions[1].start)
+        : document.offsetAt(end) + char.length - closeChar.length
+    const openPosition = document.positionAt(openOffset)
+    const closePosition = document.positionAt(closeOffset)
+    const beforeOpen = document.lineAt(openPosition.line).text.slice(0, openPosition.character)
+    const afterClose = document.lineAt(closePosition.line).text.slice(closePosition.character + closeChar.length)
+
+    return beforeOpen.trim() && afterClose.trim()
 }
 
 /* Chars ------------------------------------------------------------------- */

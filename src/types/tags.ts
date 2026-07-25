@@ -55,6 +55,10 @@ export function createTagSelections(editor, selection, tagResult, _before, _afte
     const tagIndent = tagLineText.match(/^[\t ]+/)?.[0] ?? ''
 
     if (direction === 'toRight') {
+        if (!_after) {
+            return false
+        }
+
         // Cursor after open tag — insert \n after open tag & before close tag
         const closeTagPos = findCloseTagStart(symbol, document)
 
@@ -71,6 +75,10 @@ export function createTagSelections(editor, selection, tagResult, _before, _afte
         result._closingIndentKey = `${closeTagPos.line}:${closeTagPos.character}`
 
         return result
+    }
+
+    if (!_before) {
+        return false
     }
 
     // Cursor before close tag — insert \n before close tag & after open tag

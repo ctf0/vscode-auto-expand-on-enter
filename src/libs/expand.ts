@@ -169,7 +169,34 @@ export async function expandNewLine(languages, charsList, open, close) {
         }
     }
 
+    const closingTagIndent = isSupported && selections.length === 1
+        ? getClosingTagIndent(editor.document, selections[0])
+        : null
+
+    if (closingTagIndent !== null) {
+        const {end} = selections[0]
+
+        await editor.edit(
+            (edit) => edit.insert(end, EOL + closingTagIndent),
+            {undoStopBefore: false, undoStopAfter: false},
+        )
+
+        const line = end.line + 1
+        const character = closingTagIndent.length
+        editor.selections = [new vscode.Selection(line, character, line, character)]
+
+        return
+    }
+
     await vscode.commands.executeCommand('default:type', {text: EOL})
+}
+
+function getClosingTagIndent(document, selection) {
+    const {line, character} = selection.end
+    const lineText = document.lineAt(line).text
+    const indent = lineText.slice(0, character)
+
+    return !indent.trim() && /^<\/[\w:-]+/.test(lineText.slice(character)) ? indent : null
 }
 
 async function createSelections(editor, selection, charsList, open, close) {
