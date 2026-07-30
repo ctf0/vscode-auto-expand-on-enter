@@ -2,7 +2,7 @@
     "name": "auto-expand-on-enter",
     "displayName": "Auto Expand On Enter",
     "description": "auto expand braces ex.'(),[],{}' when pressing enter",
-    "version": "0.2.8",
+    "version": "0.2.9",
     "publisher": "ctf0",
     "repository": "https://github.com/ctf0/vscode-auto-expand-on-enter",
     "engines": {
@@ -81,7 +81,8 @@
         "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
         "esbuild": "npm run esbuild-base -- --sourcemap",
         "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
-        "watch": "npm run esbuild"
+        "watch": "npm run esbuild",
+        "test": "node --test build/test.js"
     },
     "devDependencies": {
         "@types/vscode": "^1.110.0",

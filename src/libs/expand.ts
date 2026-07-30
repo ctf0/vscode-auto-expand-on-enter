@@ -1,5 +1,6 @@
-import {EOL} from 'os'
 import * as vscode from 'vscode'
+import {EOL} from 'os'
+import {contentExpand} from './expandString'
 import {invertSelections} from '../utils'
 import {createBracketSelections} from '../types/brackets'
 import {getTagCharResult, createTagSelections} from '../types/tags'
@@ -15,15 +16,10 @@ export async function expandContent(languages) {
                 const {start} = selection
                 let txt = document.lineAt(start.line).text
                 const length = txt.length
-                const match = txt.match(/^[\t ]+/)
-                const space = match?.[0] ?? ''
+                const tabSize = typeof editor.options.tabSize === 'number' ? editor.options.tabSize : 4
+                const insertSpaces = editor.options.insertSpaces !== false
 
-                txt = txt
-                    .replace(/\)(\.|->)/g, `)${EOL}${space}$1`)
-                    .replace(/([\t ]+)?(\&{2,}|\|{2,})/g, (match) => `${match}${EOL}${space}`)
-                    .replace(/(?<=['"\S])([\t ]+)?,([\t ]+)?['"\S]/g, (match) =>
-                        match.replace(/,[\t ]+/, `,${EOL}${space}`),
-                    )
+                txt = contentExpand(txt, tabSize, insertSpaces)
 
                 await editor.edit(
                     (edit) => edit.replace(new vscode.Range(start.line, 0, start.line, length), txt),
