@@ -1,10 +1,28 @@
 import escapeStringRegexp from 'escape-string-regexp'
 import * as vscode from 'vscode'
 import {detectNonCodeRanges} from '../libs/grammar'
-import {isInsideOffsetRange} from '../libs/nonCode'
+import {extractIndent} from '../libs/indent'
+import {NonCodeRange, isInsideOffsetRange} from '../libs/nonCode'
 import {getText, getPositions} from '../shared'
 
-export async function createBracketSelections(editor, selection, charsList, open, close) {
+interface BracketSelectionResult extends Array<vscode.Selection> {
+    tagOpeningIndent? : string
+}
+
+interface CharResult {
+    before    : string
+    after     : string
+    char      : string
+    direction : 'toLeft' | 'toRight' | ''
+}
+
+export async function createBracketSelections(
+    editor: vscode.TextEditor,
+    selection: vscode.Selection,
+    charsList: Record<string, string>,
+    open: string[],
+    close: string[],
+): Promise<BracketSelectionResult | false> {
     const {end} = selection
     const {document} = editor
 
@@ -12,14 +30,14 @@ export async function createBracketSelections(editor, selection, charsList, open
 
     const result = getCharResult(document, end, open, close)
 
-    if (!Object.hasOwn(result, 'char')) {
+    if (!result.char || !result.direction) {
         return false
     }
 
     const {char, direction, before, after} = result
     const isRight = direction !== 'toLeft'
     const openChar = isRight ? char.trim() : open.find((key) => charsList[key] === char.trim())
-    const closeChar = isRight ? charsList[openChar] : char.trim()
+    const closeChar = isRight ? charsList[openChar!] : char.trim()
 
     if (!openChar || !closeChar) {
         return false
@@ -33,32 +51,38 @@ export async function createBracketSelections(editor, selection, charsList, open
         return false
     }
 
-    const searchIn = getText(isRight, document, end, char.length)
+    const searchIn = getText(direction as 'toLeft' | 'toRight', document, end, char.length)
     const offset = await getOffset(isRight, searchIn, openChar, closeChar, char.length, document, end, nonCodeRanges)
 
     if (offset === undefined) {
         return false
     }
 
-    const positions = getPositions(isRight, document, end, offset, isRight ? char.length : openChar.length, before, after)
+    const positions = getPositions(direction as 'toLeft' | 'toRight', document, end, offset, isRight ? char.length : openChar.length, before, after) as BracketSelectionResult
 
     if (positions.length < 2 || !hasContentAroundPair(document, end, char, openChar, closeChar, positions, isRight)) {
         return false
     }
 
-    // when the bracket pair is <>, the close char > belongs to an HTML tag
-    // — attach the opening tag's first-line indent so the edit loop can use it
     if (openChar === '>' && closeChar === '<') {
         const tagDocOffset = document.offsetAt(end) - char.length + offset
         const tagLine = document.positionAt(tagDocOffset).line
         const tagLineText = document.lineAt(tagLine).text
-        positions.tagOpeningIndent = tagLineText.match(/^[\t ]+/)?.[0] ?? ''
+        positions.tagOpeningIndent = extractIndent(tagLineText)
     }
 
     return positions
 }
 
-function hasContentAroundPair(document, end, char, openChar, closeChar, positions, isRight) {
+function hasContentAroundPair(
+    document: vscode.TextDocument,
+    end: vscode.Position,
+    char: string,
+    openChar: string,
+    closeChar: string,
+    positions: vscode.Selection[],
+    isRight: boolean,
+): boolean {
     const openOffset = isRight
         ? document.offsetAt(end) - char.length
         : document.offsetAt(positions[1].start) - openChar.length
@@ -68,20 +92,18 @@ function hasContentAroundPair(document, end, char, openChar, closeChar, position
     const openPosition = document.positionAt(openOffset)
     const closePosition = document.positionAt(closeOffset)
     const beforeOpen = document.lineAt(openPosition.line).text.slice(0, openPosition.character)
-    const afterClose = document.lineAt(closePosition.line).text.slice(closePosition.character + closeChar.length)
 
     return Boolean(beforeOpen.trim())
 }
 
 /* Chars ------------------------------------------------------------------- */
-function getChar(document, range, regex) {
+function getChar(document: vscode.TextDocument, range: vscode.Range, regex: RegExp): string {
     const match = document.getText(range).match(regex)
 
     return match ? match[0] : ''
 }
 
-function getCharResult(document, end, open, close) {
-    let result = {}
+function getCharResult(document: vscode.TextDocument, end: vscode.Position, open: string[], close: string[]): CharResult {
     const {line, character} = end
     const lineText = document.lineAt(line).text
 
@@ -91,15 +113,17 @@ function getCharResult(document, end, open, close) {
     const closeAfter = getConfiguredChar(lineText.slice(character), close, false)
 
     if (closeAfter) {
-        result = {char: closeAfter, direction: 'toLeft'}
-    } else if (openBefore) {
-        result = {char: openBefore, direction: 'toRight'}
+        return {char: closeAfter, direction: 'toLeft', before, after}
     }
 
-    return Object.assign(result, {before, after})
+    if (openBefore) {
+        return {char: openBefore, direction: 'toRight', before, after}
+    }
+
+    return {char: '', direction: '', before, after}
 }
 
-function getConfiguredChar(text, chars, fromEnd) {
+function getConfiguredChar(text: string, chars: string[], fromEnd: boolean): string {
     for (const char of [...chars].sort((a, b) => b.length - a.length)) {
         const regex = fromEnd
             ? new RegExp(`${escapeStringRegexp(char)}[\\t ]*$`)
@@ -115,7 +139,16 @@ function getConfiguredChar(text, chars, fromEnd) {
 }
 
 /* Offset ------------------------------------------------------------------ */
-async function getOffset(isRight, txt, openChar, closeChar, boundaryLength, document, end, nonCodeRanges) {
+async function getOffset(
+    isRight: boolean,
+    txt: string,
+    openChar: string,
+    closeChar: string,
+    boundaryLength: number,
+    document: vscode.TextDocument,
+    end: vscode.Position,
+    nonCodeRanges: NonCodeRange[],
+): Promise<number | undefined> {
     const regex = `${escapeStringRegexp(openChar)}|${escapeStringRegexp(closeChar)}`
     const startDocOffset = isRight
         ? document.offsetAt(end) - boundaryLength
@@ -126,37 +159,55 @@ async function getOffset(isRight, txt, openChar, closeChar, boundaryLength, docu
         : await getCharOffsetLeft(txt.slice(0, -boundaryLength), regex, openChar, nonCodeRanges, startDocOffset)
 }
 
-async function getCharOffsetRight(txt, regex, open, nonCodeRanges, startDocOffset) {
-    let pos
+async function getCharOffsetRight(
+    txt: string,
+    regex: string,
+    open: string,
+    nonCodeRanges: NonCodeRange[],
+    startDocOffset: number,
+): Promise<number | undefined> {
+    let pos: number | undefined
     let isOpen = 0
 
-    txt.replace(new RegExp(regex, 'g'), (match, offset) => {
+    txt.replace(new RegExp(regex, 'g'), (match: string, offset: number) => {
+        if (pos !== undefined) {
+            return match
+        }
+
         const docOffset = startDocOffset + offset
 
         if (isInsideOffsetRange(docOffset, nonCodeRanges, {excludeKinds: ['template']})) {
-            return
+            return match
         }
 
         match === open
             ? isOpen++
             : isOpen--
 
-        if (isOpen === 0 && pos === undefined) {
+        if (isOpen === 0) {
             pos = offset
         }
+
+        return match
     })
 
     return pos
 }
 
-async function getCharOffsetLeft(txt, regex, open, nonCodeRanges, startDocOffset) {
-    const pos = []
+async function getCharOffsetLeft(
+    txt: string,
+    regex: string,
+    open: string,
+    nonCodeRanges: NonCodeRange[],
+    startDocOffset: number,
+): Promise<number | undefined> {
+    const pos: number[] = []
 
-    txt.replace(new RegExp(regex, 'g'), (match, offset) => {
+    txt.replace(new RegExp(regex, 'g'), (match: string, offset: number) => {
         const docOffset = startDocOffset + offset
 
         if (isInsideOffsetRange(docOffset, nonCodeRanges, {excludeKinds: ['template']})) {
-            return
+            return match
         }
 
         if (match === open) {
@@ -164,6 +215,8 @@ async function getCharOffsetLeft(txt, regex, open, nonCodeRanges, startDocOffset
         } else {
             pos.pop()
         }
+
+        return match
     })
 
     return pos[pos.length - 1]

@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "lib": [
+            "es2022"
+        ],
+        "module": "commonjs",
+        "noEmit": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "strict": true,
+        "target": "es2022"
+    },
+    "exclude": [
+        "src/**/*.test.ts",
+        "node_modules"
+    ],
+    "include": [
+        "src"
+    ]
+}

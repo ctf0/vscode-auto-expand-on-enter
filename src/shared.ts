@@ -1,27 +1,35 @@
 import * as vscode from 'vscode'
 
-export function getText(isRight, document, end, len) {
-    const {line, character} = end
+export function getText(direction: 'toLeft' | 'toRight', document: vscode.TextDocument, position: vscode.Position, length: number): string {
+    const {line, character} = position
 
-    return isRight
-        ? document.getText(document.validateRange(new vscode.Range(line, character - len, document.lineCount + 1, 0)))
-        : document.getText(document.validateRange(new vscode.Range(0, 0, line, character + len)))
+    return direction === 'toRight'
+        ? document.getText(document.validateRange(new vscode.Range(line, Math.max(0, character - length), document.lineCount + 1, 0)))
+        : document.getText(document.validateRange(new vscode.Range(0, 0, line, character + length)))
 }
 
-export function getPositions(isRight, document, end, offset, length, before, after) {
-    const pos = isRight
-        ? document.positionAt(document.offsetAt(end) - length + offset)
+export function getPositions(
+    direction: 'toLeft' | 'toRight',
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    offset: number,
+    length: number,
+    hasContentBefore: string,
+    hasContentAfter: string,
+): vscode.Selection[] {
+    const pos = direction === 'toRight'
+        ? document.positionAt(document.offsetAt(position) - length + offset)
         : document.positionAt(offset + length)
 
     if (
-        (isRight && !after)
-        || (!isRight && !before)
+        (direction === 'toRight' && !hasContentAfter)
+        || (direction === 'toLeft' && !hasContentBefore)
     ) {
-        return [new vscode.Selection(end, end)]
+        return [new vscode.Selection(position, position)]
     }
 
     return [
-        new vscode.Selection(end, end),
+        new vscode.Selection(position, position),
         new vscode.Selection(pos, pos),
     ]
 }

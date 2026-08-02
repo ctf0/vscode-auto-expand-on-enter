@@ -1,38 +1,53 @@
 import * as vscode from 'vscode'
 import {EOL} from 'os'
 import {contentExpand} from './expandString'
+import {isPositionInNonCode} from './grammar'
+import {extractIndent} from './indent'
 import {invertSelections} from '../utils'
 import {createBracketSelections} from '../types/brackets'
 import {getTagCharResult, createTagSelections} from '../types/tags'
 
-export async function expandContent(languages) {
+export async function expandContent(languages: string[]) {
     const editor = vscode.window.activeTextEditor
 
     if (editor && languages.includes(editor.document.languageId)) {
         const {document, selections} = editor
+        let edited = false
 
         for (const selection of invertSelections(selections)) {
             if (selection.isSingleLine) {
                 const {start} = selection
-                let txt = document.lineAt(start.line).text
+
+                if (isPositionInNonCode(document, start)) {
+                    continue
+                }
+
+                const txt = document.lineAt(start.line).text
                 const length = txt.length
                 const tabSize = typeof editor.options.tabSize === 'number' ? editor.options.tabSize : 4
                 const insertSpaces = editor.options.insertSpaces !== false
+                const expanded = contentExpand(txt, tabSize, insertSpaces, document.languageId)
 
-                txt = contentExpand(txt, tabSize, insertSpaces)
+                // skip no-op expansions so the document is not marked dirty
+                if (expanded === txt) {
+                    continue
+                }
 
                 await editor.edit(
-                    (edit) => edit.replace(new vscode.Range(start.line, 0, start.line, length), txt),
+                    (edit) => edit.replace(new vscode.Range(start.line, 0, start.line, length), expanded),
                     {undoStopBefore: false, undoStopAfter: false},
                 )
+                edited = true
             }
         }
 
-        await vscode.commands.executeCommand('cursorEnd')
+        if (edited) {
+            await vscode.commands.executeCommand('cursorEnd')
+        }
     }
 }
 
-export async function expandNewLine(languages, charsList, open, close) {
+export async function expandNewLine(languages: string[], charsList: Record<string, string>, open: string[], close: string[]) {
     const editor = vscode.window.activeTextEditor
 
     if (!editor) {
@@ -40,20 +55,19 @@ export async function expandNewLine(languages, charsList, open, close) {
     }
 
     let {selections} = editor
-    const arr = []
+    const arr: vscode.Selection[] = []
     const isSupported = languages.includes(editor.document.languageId)
 
     if (isSupported) {
         selections = invertSelections(selections)
 
-        const tagIndents = new Map()
+        const tagIndents = new Map<string, string>()
 
         for (const selection of selections) {
             const res = await createSelections(editor, selection, charsList, open, close)
 
             if (res) {
                 if (res.tagOpeningIndent !== undefined) {
-                    // key by close-tag position (explicit from tags.ts) or fall back to cursor position
                     const endKey = res._closingIndentKey ?? `${selection.end.line}:${selection.end.character}`
                     tagIndents.set(endKey, res.tagOpeningIndent)
                 }
@@ -63,9 +77,9 @@ export async function expandNewLine(languages, charsList, open, close) {
         }
 
         if (arr.length) {
-            const seen = new Set()
-            const edits = []
-            const cursorTargets = []
+            const seen = new Set<string>()
+            const edits: {pos: vscode.Position, text: string}[] = []
+            const cursorTargets: {originalLine: number, originalChar: number, col: number}[] = []
 
             const tabSize = typeof editor.options.tabSize === 'number' ? editor.options.tabSize : 4
             const insertSpaces = editor.options.insertSpaces !== false
@@ -74,6 +88,11 @@ export async function expandNewLine(languages, charsList, open, close) {
             for (let i = 0; i < arr.length; i += 2) {
                 const selA = arr[i]
                 const selB = arr[i + 1]
+
+                if (!selB) {
+                    break
+                }
+
                 const [contentPos, closingPos] = selA.start.character <= selB.start.character
                     ? [selA.start, selB.start]
                     : [selB.start, selA.start]
@@ -82,19 +101,15 @@ export async function expandNewLine(languages, charsList, open, close) {
                 const contentKey = `${contentPos.line}:${contentPos.character}`
 
                 const lineText = editor.document.lineAt(contentPos.line).text
-                const leadingWhitespace = lineText.match(/^[\t ]+/)?.[0] ?? ''
+                const leadingWhitespace = extractIndent(lineText)
 
-                // use the opening tag's indent (not the cursor line's) for the closing tag
                 const tagIndent = tagIndents.get(closingKey) ?? leadingWhitespace
 
-                // when cursor line is deeper than the opening tag line (multiline tags),
-                // base the content indent on the opening tag's indent too
                 const contentIndent = leadingWhitespace.length <= tagIndent.length
                     ? leadingWhitespace
                     : tagIndent
 
                 if (closingKey === contentKey) {
-                    // same spot e.g. <div>|</div> — combine both edits
                     if (!seen.has(closingKey)) {
                         seen.add(closingKey)
                         edits.push({
@@ -165,29 +180,31 @@ export async function expandNewLine(languages, charsList, open, close) {
         }
     }
 
-    const closingTagIndent = isSupported && selections.length === 1
-        ? getClosingTagIndent(editor.document, selections[0])
-        : null
+    if (isSupported) {
+        for (const selection of selections) {
+            const closingTagIndent = getClosingTagIndent(editor.document, selection)
 
-    if (closingTagIndent !== null) {
-        const {end} = selections[0]
+            if (closingTagIndent !== null) {
+                const {end} = selection
 
-        await editor.edit(
-            (edit) => edit.insert(end, EOL + closingTagIndent),
-            {undoStopBefore: false, undoStopAfter: false},
-        )
+                await editor.edit(
+                    (edit) => edit.insert(end, EOL + closingTagIndent),
+                    {undoStopBefore: false, undoStopAfter: false},
+                )
 
-        const line = end.line + 1
-        const character = closingTagIndent.length
-        editor.selections = [new vscode.Selection(line, character, line, character)]
+                const line = end.line + 1
+                const character = closingTagIndent.length
+                editor.selections = [new vscode.Selection(line, character, line, character)]
 
-        return
+                return
+            }
+        }
     }
 
     await vscode.commands.executeCommand('default:type', {text: EOL})
 }
 
-function getClosingTagIndent(document, selection) {
+function getClosingTagIndent(document: vscode.TextDocument, selection: vscode.Selection): string | null {
     const {line, character} = selection.end
     const lineText = document.lineAt(line).text
     const indent = lineText.slice(0, character)
@@ -195,7 +212,18 @@ function getClosingTagIndent(document, selection) {
     return !indent.trim() && /^<\/[\w:-]+/.test(lineText.slice(character)) ? indent : null
 }
 
-async function createSelections(editor, selection, charsList, open, close) {
+interface SelectionResult extends Array<vscode.Selection> {
+    tagOpeningIndent?  : string
+    _closingIndentKey? : string
+}
+
+async function createSelections(
+    editor: vscode.TextEditor,
+    selection: vscode.Selection,
+    charsList: Record<string, string>,
+    open: string[],
+    close: string[],
+): Promise<SelectionResult | false> {
     const {end} = selection
     const {document} = editor
     const {line, character} = end
@@ -216,7 +244,7 @@ async function createSelections(editor, selection, charsList, open, close) {
     const bracketResult = await createBracketSelections(editor, selection, charsList, open, close)
 
     if (bracketResult) {
-        return bracketResult
+        return bracketResult as SelectionResult
     }
 
     return false

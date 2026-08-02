@@ -1,10 +1,40 @@
 import * as vscode from 'vscode'
+import {extractIndent} from '../libs/indent'
 
-export async function getTagCharResult(document, end) {
-    const symbols = await vscode.commands.executeCommand(
-        'vscode.executeDocumentSymbolProvider',
-        document.uri,
-    )
+let cachedSymbols: vscode.DocumentSymbol[] | undefined
+let cachedUri = ''
+let cachedVersion = -1
+
+interface TagResult {
+    tagName   : string
+    symbol    : vscode.DocumentSymbol
+    direction : 'toLeft' | 'toRight'
+}
+
+interface TagSelectionResult extends Array<vscode.Selection> {
+    tagOpeningIndent?  : string
+    _closingIndentKey? : string
+}
+
+export async function getTagCharResult(document: vscode.TextDocument, end: vscode.Position): Promise<TagResult | null> {
+    let symbols: vscode.DocumentSymbol[] | undefined
+
+    try {
+        if (cachedUri === document.uri.toString() && cachedVersion === document.version) {
+            symbols = cachedSymbols
+        } else {
+            symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+                'vscode.executeDocumentSymbolProvider',
+                document.uri,
+            )
+
+            cachedUri = document.uri.toString()
+            cachedVersion = document.version
+            cachedSymbols = symbols
+        }
+    } catch {
+        return null
+    }
 
     if (!symbols?.length) {
         return null
@@ -46,13 +76,19 @@ export async function getTagCharResult(document, end) {
     return null
 }
 
-export function createTagSelections(editor, selection, tagResult, _before, _after) {
+export function createTagSelections(
+    editor: vscode.TextEditor,
+    selection: vscode.Selection,
+    tagResult: TagResult,
+    _before: string,
+    _after: string,
+): TagSelectionResult | false {
     const {end} = selection
     const {document} = editor
     const {direction, symbol} = tagResult
 
     const tagLineText = document.lineAt(symbol.range.start.line).text
-    const tagIndent = tagLineText.match(/^[\t ]+/)?.[0] ?? ''
+    const tagIndent = extractIndent(tagLineText)
 
     if (direction === 'toRight') {
         if (!_after) {
@@ -66,7 +102,7 @@ export function createTagSelections(editor, selection, tagResult, _before, _afte
             return false
         }
 
-        const result = [
+        const result: TagSelectionResult = [
             new vscode.Selection(end, end),
             new vscode.Selection(closeTagPos, closeTagPos),
         ]
@@ -88,7 +124,7 @@ export function createTagSelections(editor, selection, tagResult, _before, _afte
         return false
     }
 
-    const result = [
+    const result: TagSelectionResult = [
         new vscode.Selection(end, end),
         new vscode.Selection(openTagEnd, openTagEnd),
     ]
@@ -100,8 +136,8 @@ export function createTagSelections(editor, selection, tagResult, _before, _afte
 
 /* Helpers ---------------------------------------------------------------- */
 
-function flattenSymbols(symbols) {
-    const result = []
+function flattenSymbols(symbols: vscode.DocumentSymbol[]): vscode.DocumentSymbol[] {
+    const result: vscode.DocumentSymbol[] = []
 
     for (const sym of symbols) {
         result.push(sym)
@@ -114,14 +150,14 @@ function flattenSymbols(symbols) {
     return result
 }
 
-function findOpenTagEnd(symbol, document) {
+function findOpenTagEnd(symbol: vscode.DocumentSymbol, document: vscode.TextDocument): vscode.Position | null {
     // Scan from the element start to find the closing > of the open tag,
     // skipping > inside quoted attribute values.
     const text = document.getText(
         new vscode.Range(symbol.range.start, symbol.range.end),
     )
 
-    let inQuote = null
+    let inQuote: string | null = null
 
     for (let i = 0; i < text.length; i++) {
         const ch = text[i]
@@ -146,7 +182,7 @@ function findOpenTagEnd(symbol, document) {
     return null
 }
 
-function findCloseTagStart(symbol, document) {
+function findCloseTagStart(symbol: vscode.DocumentSymbol, document: vscode.TextDocument): vscode.Position | null {
     const rangeEnd = symbol.range.end
     const lineText = document.lineAt(rangeEnd.line).text.slice(0, rangeEnd.character)
     const closeTagIdx = lineText.lastIndexOf('</')

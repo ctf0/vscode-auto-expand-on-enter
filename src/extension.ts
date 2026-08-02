@@ -1,10 +1,10 @@
 import * as vscode from 'vscode'
 import {expandContent, expandNewLine} from './libs/expand'
-import {languages, charsList, open, close, readConfig} from './utils'
+import {getLanguages, getCharsList, getOpen, getClose, readConfig} from './utils'
 
 const PACKAGE_NAME = 'autoExpandOnEnter'
 
-export function activate(context) {
+export function activate(context: vscode.ExtensionContext) {
     readConfig()
 
     context.subscriptions.push(
@@ -13,8 +13,8 @@ export function activate(context) {
                 readConfig()
             }
         }),
-        vscode.commands.registerCommand('autoExpand.content', () => expandContent(languages)),
-        vscode.commands.registerCommand('autoExpand.newLine', () => expandNewLine(languages, charsList, open, close)),
+        vscode.commands.registerCommand('autoExpand.content', () => expandContent(getLanguages())),
+        vscode.commands.registerCommand('autoExpand.newLine', () => expandNewLine(getLanguages(), getCharsList(), getOpen(), getClose())),
     )
 }
 

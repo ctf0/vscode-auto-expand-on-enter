@@ -1,146 +1,44 @@
 import * as vscode from 'vscode'
 import {NonCodeRange, isInsideOffsetRange} from './nonCode'
-
-/* Language groups share the same string/comment delimiters.
- * A match function replaces the per-language lookup table. */
-interface LanguageDelimiters {
-    singleLineComment  : string[]
-    multiLineComment   : [string, string][]
-    stringDelimiters   : string[]
-    templateDelimiters : [string, string][]
-}
-
-const defaultDelimiters: LanguageDelimiters = {
-    singleLineComment  : [],
-    multiLineComment   : [],
-    stringDelimiters   : ['"', '\''],
-    templateDelimiters : [],
-}
-
-const cStyleDelimiters: LanguageDelimiters = {
-    singleLineComment  : ['//'],
-    multiLineComment   : [['/*', '*/']],
-    stringDelimiters   : ['"', '\''],
-    templateDelimiters : [],
-}
-
-const slashHashDelimiters: LanguageDelimiters = {
-    singleLineComment  : ['//', '#'],
-    multiLineComment   : [['/*', '*/']],
-    stringDelimiters   : ['"', '\''],
-    templateDelimiters : [],
-}
-
-const hashDelimiters: LanguageDelimiters = {
-    singleLineComment  : ['#'],
-    multiLineComment   : [],
-    stringDelimiters   : ['"', '\''],
-    templateDelimiters : [],
-}
-
-const dashDelimiters: LanguageDelimiters = {
-    singleLineComment  : ['--'],
-    multiLineComment   : [],
-    stringDelimiters   : ['"', '\''],
-    templateDelimiters : [],
-}
-
-const exclamationDelimiters: LanguageDelimiters = {
-    singleLineComment  : ['!'],
-    multiLineComment   : [],
-    stringDelimiters   : ['"', '\''],
-    templateDelimiters : [],
-}
-
-function matchDelimiters(languageId: string): LanguageDelimiters {
-    switch (true) {
-        case /^(typescript|javascript)react?$/.test(languageId):
-            return {...cStyleDelimiters, templateDelimiters: [['`', '`']]}
-        case /^(jsx|tsx)$/.test(languageId):
-            return {...cStyleDelimiters, templateDelimiters: [['`', '`']]}
-        case /^(blade|twig|jinja|handlebars|hbs|ejs|pug|jade|haml|slim|vue)$/.test(languageId):
-            return {...cStyleDelimiters, templateDelimiters: [['{{', '}}']]}
-        case languageId === 'php':
-            return slashHashDelimiters
-        case languageId === 'python':
-            return {
-                singleLineComment  : ['#'],
-                multiLineComment   : [['"""', '"""'], ['\'\'\'', '\'\'\'']],
-                stringDelimiters   : ['"', '\''],
-                templateDelimiters : [],
-            }
-        case /^(go|rust|java|csharp|cpp|c|objc|swift|kotlin|scala|dart|solidity|elm|erlang|haskell)$/.test(languageId):
-            return cStyleDelimiters
-        case /^(ruby|perl|r|matlab|elixir)$/.test(languageId):
-            return hashDelimiters
-        case /^(css|scss|less|shellscript|bash|zsh|sh|powershell)$/.test(languageId):
-            return cStyleDelimiters
-        case languageId === 'sql':
-            return {
-                singleLineComment  : ['--'],
-                multiLineComment   : [['/*', '*/']],
-                stringDelimiters   : ['\'', '"'],
-                templateDelimiters : [],
-            }
-        case languageId === 'lua':
-            return {
-                singleLineComment  : ['--'],
-                multiLineComment   : [['--[[', ']]']],
-                stringDelimiters   : ['"', '\''],
-                templateDelimiters : [],
-            }
-        case /^(html|xml|svg|markdown|json|yaml|toml|ini|dockerfile|haml)$/.test(languageId):
-            return {
-                singleLineComment : [],
-                multiLineComment  : languageId === 'html' || languageId === 'xml' || languageId === 'svg' || languageId === 'markdown'
-                    ? [['<!--', '-->']]
-                    : [],
-                stringDelimiters   : ['"', '\''],
-                templateDelimiters : [],
-            }
-        case languageId === 'svelte':
-            return {
-                singleLineComment  : ['<!--'],
-                multiLineComment   : [],
-                stringDelimiters   : ['"', '\''],
-                templateDelimiters : [],
-            }
-        case languageId === 'fortran':
-            return exclamationDelimiters
-        case languageId === 'clojure':
-            return {singleLineComment: [';'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []}
-        case languageId === 'cobol':
-            return {singleLineComment: ['*'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []}
-        default:
-            return defaultDelimiters
-    }
-}
+import {getLanguageDelimiters, LanguageDelimiters} from './delimiters'
 
 /* ------------------------------------------------------------------ */
 /*  Non-code range detection                                           */
 /* ------------------------------------------------------------------ */
 
-/**
- * Detect all non-code ranges (strings, comments, templates) in the given
- * document using language-specific grammar rules.
- *
- * The detection is intentionally approximate — it handles the common cases
- * and avoids false positives in brackets.ts.
- */
+const rangeCache = new Map<string, {ranges: NonCodeRange[], version: number}>()
+
 export function detectNonCodeRanges(document: vscode.TextDocument): NonCodeRange[] {
-    const config = matchDelimiters(document.languageId)
+    const cacheKey = document.uri.toString()
+    const cached = rangeCache.get(cacheKey)
+
+    if (cached && cached.version === document.version) {
+        return cached.ranges
+    }
+
+    const config = getLanguageDelimiters(document.languageId)
     const ranges: NonCodeRange[] = []
-    /* We'll use line-level scanning to keep it efficient. */
     const fullText = document.getText()
 
     scanForComments(document, fullText, config.multiLineComment, ranges)
     scanForStrings(document, fullText, config.stringDelimiters, config.templateDelimiters, ranges)
     scanForSingleLineComments(document, fullText, config.singleLineComment, ranges)
 
-    /* Sort and merge overlapping ranges. */
     ranges.sort((a, b) => a.startOffset - b.startOffset)
 
-    return mergeRanges(ranges)
+    const merged = mergeRanges(ranges)
+
+    rangeCache.set(cacheKey, {ranges: merged, version: document.version})
+
+    if (rangeCache.size > 100) {
+        const firstKey = rangeCache.keys().next().value
+
+        if (firstKey) {
+            rangeCache.delete(firstKey)
+        }
+    }
+
+    return merged
 }
 
 function scanForComments(
@@ -299,7 +197,7 @@ function mergeRanges(ranges: NonCodeRange[]): NonCodeRange[] {
 
         if (ranges[i].startOffset <= last.endOffset) {
             if (ranges[i].endOffset > last.endOffset) {
-                last.endOffset = ranges[i].endOffset
+                merged[merged.length - 1] = {...last, endOffset: ranges[i].endOffset}
             }
         } else {
             merged.push(ranges[i])
