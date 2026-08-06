@@ -54,162 +54,195 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
         return
     }
 
-    let {selections} = editor
-    const arr: vscode.Selection[] = []
-    const isSupported = languages.includes(editor.document.languageId)
+    try {
+        let {selections} = editor
+        const arr: vscode.Selection[] = []
+        const isSupported = languages.includes(editor.document.languageId)
 
-    if (isSupported) {
-        selections = invertSelections(selections)
+        if (isSupported) {
+            selections = invertSelections(selections)
 
-        const tagIndents = new Map<string, string>()
+            const tagIndents = new Map<string, string>()
 
-        for (const selection of selections) {
-            const res = await createSelections(editor, selection, charsList, open, close)
+            for (const selection of selections) {
+                const res = await createSelections(editor, selection, charsList, open, close)
 
-            if (res) {
-                if (res.tagOpeningIndent !== undefined) {
-                    const endKey = res._closingIndentKey ?? `${selection.end.line}:${selection.end.character}`
-                    tagIndents.set(endKey, res.tagOpeningIndent)
-                }
-
-                arr.push(...res)
-            }
-        }
-
-        if (arr.length) {
-            const seen = new Set<string>()
-            const edits: {pos: vscode.Position, text: string}[] = []
-            const cursorTargets: {originalLine: number, originalChar: number, col: number}[] = []
-
-            const tabSize = typeof editor.options.tabSize === 'number' ? editor.options.tabSize : 4
-            const insertSpaces = editor.options.insertSpaces !== false
-            const indentUnit = insertSpaces ? ' '.repeat(tabSize) : '\t'
-
-            for (let i = 0; i < arr.length; i += 2) {
-                const selA = arr[i]
-                const selB = arr[i + 1]
-
-                if (!selB) {
-                    break
-                }
-
-                const [contentPos, closingPos] = selA.start.character <= selB.start.character
-                    ? [selA.start, selB.start]
-                    : [selB.start, selA.start]
-
-                const closingKey = `${closingPos.line}:${closingPos.character}`
-                const contentKey = `${contentPos.line}:${contentPos.character}`
-
-                const lineText = editor.document.lineAt(contentPos.line).text
-                const leadingWhitespace = extractIndent(lineText)
-
-                const tagIndent = tagIndents.get(closingKey) ?? leadingWhitespace
-
-                const contentIndent = leadingWhitespace.length <= tagIndent.length
-                    ? leadingWhitespace
-                    : tagIndent
-
-                if (closingKey === contentKey) {
-                    if (!seen.has(closingKey)) {
-                        seen.add(closingKey)
-                        edits.push({
-                            pos  : contentPos,
-                            text : EOL + contentIndent + indentUnit + EOL + tagIndent,
-                        })
-                        cursorTargets.push({
-                            originalLine : contentPos.line,
-                            originalChar : contentPos.character,
-                            col          : contentIndent.length + indentUnit.length,
-                        })
-                    }
-                } else {
-                    if (!seen.has(closingKey)) {
-                        seen.add(closingKey)
-                        edits.push({
-                            pos  : closingPos,
-                            text : EOL + tagIndent,
-                        })
+                if (res) {
+                    if (res.tagOpeningIndent !== undefined) {
+                        const endKey = res._closingIndentKey ?? `${selection.end.line}:${selection.end.character}`
+                        tagIndents.set(endKey, res.tagOpeningIndent)
                     }
 
-                    if (!seen.has(contentKey)) {
-                        seen.add(contentKey)
-                        const contentLen = closingPos.character - contentPos.character
-                        edits.push({
-                            pos  : contentPos,
-                            text : EOL + contentIndent + indentUnit,
-                        })
-                        cursorTargets.push({
-                            originalLine : contentPos.line,
-                            originalChar : contentPos.character,
-                            col          : contentIndent.length + indentUnit.length + contentLen,
-                        })
-                    }
+                    arr.push(...res)
                 }
             }
 
-            edits.sort((a, b) =>
-                a.pos.line !== b.pos.line ? b.pos.line - a.pos.line : b.pos.character - a.pos.character,
-            )
+            if (arr.length) {
+                const seen = new Set<string>()
+                const edits: {pos: vscode.Position, text: string}[] = []
+                const cursorTargets: {originalLine: number, originalChar: number, col: number}[] = []
 
-            await editor.edit(
-                (editBuilder) => {
-                    for (const {pos, text} of edits) {
-                        editBuilder.insert(pos, text)
+                const tabSize = typeof editor.options.tabSize === 'number' ? editor.options.tabSize : 4
+                const insertSpaces = editor.options.insertSpaces !== false
+                const indentUnit = insertSpaces ? ' '.repeat(tabSize) : '\t'
+
+                for (let i = 0; i < arr.length; i += 2) {
+                    const selA = arr[i]
+                    const selB = arr[i + 1]
+
+                    if (!selB) {
+                        break
                     }
-                },
-                {undoStopBefore: false, undoStopAfter: false},
-            )
 
-            const cursorSelections = cursorTargets.map(({originalLine, originalChar, col}) => {
-                let shift = 0
+                    const [contentPos, closingPos] = selA.start.isBeforeOrEqual(selB.start)
+                        ? [selA.start, selB.start]
+                        : [selB.start, selA.start]
 
-                for (const {pos, text} of edits) {
-                    if (pos.line < originalLine || (pos.line === originalLine && pos.character < originalChar)) {
-                        shift += (text.match(/\n/g) || []).length
+                    const closingKey = `${closingPos.line}:${closingPos.character}`
+                    const contentKey = `${contentPos.line}:${contentPos.character}`
+
+                    const lineText = editor.document.lineAt(contentPos.line).text
+                    const leadingWhitespace = extractIndent(lineText)
+
+                    const tagIndent = tagIndents.get(closingKey) ?? leadingWhitespace
+
+                    const contentIndent = leadingWhitespace
+
+                    if (closingKey === contentKey) {
+                        if (!seen.has(closingKey)) {
+                            seen.add(closingKey)
+                            edits.push({
+                                pos  : contentPos,
+                                text : EOL + contentIndent + indentUnit + EOL + tagIndent,
+                            })
+                            cursorTargets.push({
+                                originalLine : contentPos.line,
+                                originalChar : contentPos.character,
+                                col          : contentIndent.length + indentUnit.length,
+                            })
+                        }
+                    } else {
+                        if (!seen.has(closingKey)) {
+                            seen.add(closingKey)
+                            edits.push({
+                                pos  : closingPos,
+                                text : EOL + tagIndent,
+                            })
+                        }
+
+                        if (!seen.has(contentKey)) {
+                            seen.add(contentKey)
+                            const contentLen = contentPos.line === closingPos.line
+                                ? closingPos.character - contentPos.character
+                                : 0
+                            edits.push({
+                                pos  : contentPos,
+                                text : EOL + contentIndent + indentUnit,
+                            })
+                            cursorTargets.push({
+                                originalLine : contentPos.line,
+                                originalChar : contentPos.character,
+                                col          : contentIndent.length + indentUnit.length + contentLen,
+                            })
+                        }
                     }
                 }
 
-                const line = originalLine + 1 + shift
-
-                return new vscode.Selection(line, col, line, col)
-            })
-
-            editor.selections = cursorSelections
-
-            return
-        }
-    }
-
-    if (isSupported) {
-        for (const selection of selections) {
-            const closingTagIndent = getClosingTagIndent(editor.document, selection)
-
-            if (closingTagIndent !== null) {
-                const {end} = selection
-
-                await editor.edit(
-                    (edit) => edit.insert(end, EOL + closingTagIndent),
-                    {undoStopBefore: false, undoStopAfter: false},
+                edits.sort((a, b) =>
+                    a.pos.line !== b.pos.line ? b.pos.line - a.pos.line : b.pos.character - a.pos.character,
                 )
 
-                const line = end.line + 1
-                const character = closingTagIndent.length
-                editor.selections = [new vscode.Selection(line, character, line, character)]
+                await editor.edit(
+                    (editBuilder) => {
+                        for (const {pos, text} of edits) {
+                            editBuilder.insert(pos, text)
+                        }
+                    },
+                    {undoStopBefore: false, undoStopAfter: true},
+                )
+
+                const cursorSelections = cursorTargets.map(({originalLine, originalChar, col}) => {
+                    let shift = 0
+
+                    for (const {pos, text} of edits) {
+                        if (pos.line < originalLine || (pos.line === originalLine && pos.character < originalChar)) {
+                            shift += (text.match(/\n/g) || []).length
+                        }
+                    }
+
+                    const line = originalLine + 1 + shift
+
+                    return new vscode.Selection(line, col, line, col)
+                })
+
+                editor.selections = cursorSelections
 
                 return
             }
         }
-    }
 
-    await vscode.commands.executeCommand('default:type', {text: EOL})
+        if (isSupported) {
+            for (const selection of selections) {
+                const closingTagIndent = getClosingTagIndent(editor.document, selection)
+
+                if (closingTagIndent !== null) {
+                    const {end} = selection
+
+                    await editor.edit(
+                        (edit) => edit.insert(end, EOL + closingTagIndent),
+                        {undoStopBefore: false, undoStopAfter: true},
+                    )
+
+                    const line = end.line + 1
+                    const character = closingTagIndent.length
+                    editor.selections = [new vscode.Selection(line, character, line, character)]
+
+                    return
+                }
+            }
+        }
+
+        const {end} = editor.selections[0] ?? selections[selections.length - 1]
+        const fallbackIndent = extractIndent(editor.document.lineAt(end.line).text)
+
+        await editor.edit(
+            (edit) => edit.insert(end, EOL + fallbackIndent),
+            {undoStopBefore: false, undoStopAfter: true},
+        )
+
+        const line = end.line + 1
+        editor.selections = [new vscode.Selection(line, fallbackIndent.length, line, fallbackIndent.length)]
+    } catch {
+        await vscode.commands.executeCommand('type', {text: '\n'})
+    }
 }
 
 function getClosingTagIndent(document: vscode.TextDocument, selection: vscode.Selection): string | null {
     const {line, character} = selection.end
     const lineText = document.lineAt(line).text
     const indent = lineText.slice(0, character)
+    const after = lineText.slice(character)
+    const match = after.match(/^<\/([\w:-]+)/)
 
-    return !indent.trim() && /^<\/[\w:-]+/.test(lineText.slice(character)) ? indent : null
+    if (!indent.trim() && match) {
+        const tagName = match[1]
+        let scanLine = line - 1
+
+        while (scanLine >= 0) {
+            const text = document.lineAt(scanLine).text
+            const ltIdx = text.indexOf('<' + tagName)
+
+            if (ltIdx !== -1 && !text.slice(0, ltIdx).trim()) {
+                return extractIndent(text)
+            }
+
+            scanLine--
+        }
+
+        return indent
+    }
+
+    return null
 }
 
 interface SelectionResult extends Array<vscode.Selection> {

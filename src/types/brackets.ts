@@ -6,7 +6,8 @@ import {NonCodeRange, isInsideOffsetRange} from '../libs/nonCode'
 import {getText, getPositions} from '../shared'
 
 interface BracketSelectionResult extends Array<vscode.Selection> {
-    tagOpeningIndent? : string
+    tagOpeningIndent?  : string
+    _closingIndentKey? : string
 }
 
 interface CharResult {
@@ -65,10 +66,9 @@ export async function createBracketSelections(
     }
 
     if (openChar === '>' && closeChar === '<') {
-        const tagDocOffset = document.offsetAt(end) - char.length + offset
-        const tagLine = document.positionAt(tagDocOffset).line
-        const tagLineText = document.lineAt(tagLine).text
-        positions.tagOpeningIndent = extractIndent(tagLineText)
+        positions.tagOpeningIndent = findOpeningTagIndent(document, end)
+        const closingPos = isRight ? positions[1].start : end
+        positions._closingIndentKey = `${closingPos.line}:${closingPos.character}`
     }
 
     return positions
@@ -93,10 +93,31 @@ function hasContentAroundPair(
     const closePosition = document.positionAt(closeOffset)
     const beforeOpen = document.lineAt(openPosition.line).text.slice(0, openPosition.character)
 
+    if (openChar.length > 1) {
+        return true
+    }
+
     return Boolean(beforeOpen.trim())
 }
 
 /* Chars ------------------------------------------------------------------- */
+function findOpeningTagIndent(document: vscode.TextDocument, end: vscode.Position): string {
+    let line = end.line
+
+    while (line >= 0) {
+        const text = document.lineAt(line).text
+        const ltIdx = text.indexOf('<')
+
+        if (ltIdx !== -1 && !text.slice(0, ltIdx).trim() && /^<[\w:-]/.test(text.slice(ltIdx))) {
+            return extractIndent(text)
+        }
+
+        line--
+    }
+
+    return extractIndent(document.lineAt(end.line).text)
+}
+
 function getChar(document: vscode.TextDocument, range: vscode.Range, regex: RegExp): string {
     const match = document.getText(range).match(regex)
 
