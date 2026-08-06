@@ -76,14 +76,19 @@ function scanForStrings(
     templateDelimiters: [string, string][],
     ranges: NonCodeRange[],
 ) {
-    /* Template strings (backtick) are scanned first so they take priority. */
+    /* Template regions (backtick for JS, {{ }} for Blade/Twig/etc.) are scanned
+     * first so they take priority over string delimiters. */
     for (const [open, close] of templateDelimiters) {
         let i = 0
 
         while ((i = text.indexOf(open, i)) !== -1) {
+            if (isInsideOffsetRange(i, ranges)) {
+                i++
+                continue
+            }
             const startOffset = i
             /* Find the matching close, respecting escapes. */
-            let j = i + 1
+            let j = i + open.length
 
             while (j < text.length) {
                 if (text[j] === '\\') {
@@ -91,8 +96,8 @@ function scanForStrings(
                     continue
                 }
 
-                if (text[j] === '`') {
-                    const endOffset = j + 1
+                if (text.startsWith(close, j)) {
+                    const endOffset = j + close.length
                     ranges.push({
                         startOffset,
                         endOffset,

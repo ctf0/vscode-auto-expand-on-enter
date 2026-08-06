@@ -53,7 +53,7 @@ export function readConfig() {
 
     if (typeof rawList === 'object' && rawList !== null && !Array.isArray(rawList)) {
         for (const [key, value] of Object.entries(rawList)) {
-            if (typeof key === 'string' && typeof value === 'string' && key.length === 1 && value.length === 1) {
+            if (typeof key === 'string' && typeof value === 'string' && key.length >= 1 && value.length >= 1) {
                 validatedCharsList[key] = value
             }
         }

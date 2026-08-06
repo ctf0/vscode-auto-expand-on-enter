@@ -93,7 +93,7 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
                     break
                 }
 
-                const [contentPos, closingPos] = selA.start.character <= selB.start.character
+                const [contentPos, closingPos] = selA.start.isBeforeOrEqual(selB.start)
                     ? [selA.start, selB.start]
                     : [selB.start, selA.start]
 
@@ -105,9 +105,7 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
 
                 const tagIndent = tagIndents.get(closingKey) ?? leadingWhitespace
 
-                const contentIndent = leadingWhitespace.length <= tagIndent.length
-                    ? leadingWhitespace
-                    : tagIndent
+                const contentIndent = leadingWhitespace
 
                 if (closingKey === contentKey) {
                     if (!seen.has(closingKey)) {
@@ -133,7 +131,9 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
 
                     if (!seen.has(contentKey)) {
                         seen.add(contentKey)
-                        const contentLen = closingPos.character - contentPos.character
+                        const contentLen = contentPos.line === closingPos.line
+                            ? closingPos.character - contentPos.character
+                            : 0
                         edits.push({
                             pos  : contentPos,
                             text : EOL + contentIndent + indentUnit,
@@ -157,7 +157,7 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
                         editBuilder.insert(pos, text)
                     }
                 },
-                {undoStopBefore: false, undoStopAfter: false},
+                {undoStopBefore: false, undoStopAfter: true},
             )
 
             const cursorSelections = cursorTargets.map(({originalLine, originalChar, col}) => {
@@ -189,7 +189,7 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
 
                 await editor.edit(
                     (edit) => edit.insert(end, EOL + closingTagIndent),
-                    {undoStopBefore: false, undoStopAfter: false},
+                    {undoStopBefore: false, undoStopAfter: true},
                 )
 
                 const line = end.line + 1
@@ -201,15 +201,40 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
         }
     }
 
-    await vscode.commands.executeCommand('default:type', {text: EOL})
+    const {end} = editor.selections[0] ?? selections[selections.length - 1]
+    const fallbackIndent = extractIndent(editor.document.lineAt(end.line).text)
+
+    await editor.edit(
+        (edit) => edit.insert(end, EOL + fallbackIndent),
+        {undoStopBefore: false, undoStopAfter: true},
+    )
+
+    const line = end.line + 1
+    editor.selections = [new vscode.Selection(line, fallbackIndent.length, line, fallbackIndent.length)]
 }
 
 function getClosingTagIndent(document: vscode.TextDocument, selection: vscode.Selection): string | null {
     const {line, character} = selection.end
     const lineText = document.lineAt(line).text
     const indent = lineText.slice(0, character)
+    const after = lineText.slice(character)
+    const match = after.match(/^<\/([\w:-]+)/)
 
-    return !indent.trim() && /^<\/[\w:-]+/.test(lineText.slice(character)) ? indent : null
+    if (!indent.trim() && match) {
+        const tagName = match[1]
+        let scanLine = line - 1
+        while (scanLine >= 0) {
+            const text = document.lineAt(scanLine).text
+            const ltIdx = text.indexOf('<' + tagName)
+            if (ltIdx !== -1 && !text.slice(0, ltIdx).trim()) {
+                return extractIndent(text)
+            }
+            scanLine--
+        }
+        return indent
+    }
+
+    return null
 }
 
 interface SelectionResult extends Array<vscode.Selection> {
