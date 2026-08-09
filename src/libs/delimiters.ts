@@ -37,9 +37,11 @@ const hashDelimiters: LanguageDelimiters = {
     templateDelimiters : [],
 }
 
-/* Group membership replaces the /^...$|^...$/ language matching.
+/* Group membership replaces the per-language regex table.
  * Check order matters: a language in more than one group (haml) gets
- * the delimiters of the group checked first. */
+ * the delimiters of the group checked first. Language-specific
+ * overrides are not members of any group, so they are checked between
+ * the template groups and the remaining plain groups. */
 const JS_LIKE = new Set(['typescript', 'typescriptreact', 'javascript', 'javascriptreact', 'jsx', 'tsx'])
 const TEMPLATE_LIKE = new Set(['blade', 'twig', 'jinja', 'handlebars', 'hbs', 'ejs', 'pug', 'jade', 'haml', 'slim', 'vue'])
 const C_LIKE = new Set(['go', 'rust', 'java', 'csharp', 'cpp', 'c', 'objc', 'swift', 'kotlin', 'scala', 'dart', 'solidity', 'elm', 'erlang', 'haskell'])
@@ -52,93 +54,94 @@ export function isJsLike(languageId: string): boolean {
     return JS_LIKE.has(languageId)
 }
 
+const templateGroups: {ids: Set<string>, template: [string, string][]}[] = [
+    {ids: JS_LIKE, template: [['`', '`']]},
+    {ids: TEMPLATE_LIKE, template: [['{{', '}}']]},
+]
+
+const plainGroups: {ids: Set<string>, delimiters: LanguageDelimiters}[] = [
+    {ids: C_LIKE, delimiters: cStyleDelimiters},
+    {ids: HASH_LIKE, delimiters: hashDelimiters},
+    {ids: SHELL_LIKE, delimiters: cStyleDelimiters},
+]
+
+const pythonDelimiters: LanguageDelimiters = {
+    singleLineComment  : ['#'],
+    multiLineComment   : [['"""', '"""'], ['\'\'\'', '\'\'\'']],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+
+const sqlDelimiters: LanguageDelimiters = {
+    singleLineComment  : ['--'],
+    multiLineComment   : [['/*', '*/']],
+    stringDelimiters   : ['\'', '"'],
+    templateDelimiters : [],
+}
+
+const luaDelimiters: LanguageDelimiters = {
+    singleLineComment  : ['--'],
+    multiLineComment   : [['--[[', ']]']],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+
+const markupDelimiters: LanguageDelimiters = {
+    singleLineComment  : [],
+    multiLineComment   : [],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+
+const svelteDelimiters: LanguageDelimiters = {
+    singleLineComment  : [],
+    multiLineComment   : [['<!--', '-->']],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+
+const fortranDelimiters: LanguageDelimiters = {
+    singleLineComment  : ['!', 'c', 'C'],
+    multiLineComment   : [],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+
+const languageOverrides: Record<string, LanguageDelimiters> = {
+    php     : slashHashDelimiters,
+    python  : pythonDelimiters,
+    sql     : sqlDelimiters,
+    lua     : luaDelimiters,
+    svelte  : svelteDelimiters,
+    fortran : fortranDelimiters,
+    clojure : {singleLineComment: [';'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []},
+    cobol   : {singleLineComment: ['*'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []},
+}
+
 export function getLanguageDelimiters(languageId: string): LanguageDelimiters {
-    if (JS_LIKE.has(languageId)) {
-        return {...cStyleDelimiters, templateDelimiters: [['`', '`']]}
-    }
-
-    if (TEMPLATE_LIKE.has(languageId)) {
-        return {...cStyleDelimiters, templateDelimiters: [['{{', '}}']]}
-    }
-
-    if (languageId === 'php') {
-        return slashHashDelimiters
-    }
-
-    if (languageId === 'python') {
-        return {
-            singleLineComment  : ['#'],
-            multiLineComment   : [['"""', '"""'], ['\'\'\'', '\'\'\'']],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
+    for (const {ids, template} of templateGroups) {
+        if (ids.has(languageId)) {
+            return {...cStyleDelimiters, templateDelimiters: template}
         }
     }
 
-    if (C_LIKE.has(languageId)) {
-        return cStyleDelimiters
+    const override = languageOverrides[languageId]
+
+    if (override) {
+        return override
     }
 
-    if (HASH_LIKE.has(languageId)) {
-        return hashDelimiters
-    }
-
-    if (SHELL_LIKE.has(languageId)) {
-        return cStyleDelimiters
-    }
-
-    if (languageId === 'sql') {
-        return {
-            singleLineComment  : ['--'],
-            multiLineComment   : [['/*', '*/']],
-            stringDelimiters   : ['\'', '"'],
-            templateDelimiters : [],
-        }
-    }
-
-    if (languageId === 'lua') {
-        return {
-            singleLineComment  : ['--'],
-            multiLineComment   : [['--[[', ']]']],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
+    for (const {ids, delimiters} of plainGroups) {
+        if (ids.has(languageId)) {
+            return delimiters
         }
     }
 
     if (MARKUP_LIKE.has(languageId)) {
         return {
-            singleLineComment : [],
-            multiLineComment  : HTML_COMMENT_LIKE.has(languageId)
-                ? [['<!--', '-->']]
-                : [],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
+            ...markupDelimiters,
+            multiLineComment : HTML_COMMENT_LIKE.has(languageId) ? [['<!--', '-->']] : [],
         }
-    }
-
-    if (languageId === 'svelte') {
-        return {
-            singleLineComment  : [],
-            multiLineComment   : [['<!--', '-->']],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
-        }
-    }
-
-    if (languageId === 'fortran') {
-        return {
-            singleLineComment  : ['!', 'c', 'C'],
-            multiLineComment   : [],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
-        }
-    }
-
-    if (languageId === 'clojure') {
-        return {singleLineComment: [';'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []}
-    }
-
-    if (languageId === 'cobol') {
-        return {singleLineComment: ['*'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []}
     }
 
     return defaultDelimiters

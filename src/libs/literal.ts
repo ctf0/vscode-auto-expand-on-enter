@@ -177,15 +177,10 @@ function scanSingleLineComments(text: string, markers: string[], ranges: Literal
     }
 }
 
-function isIdentifierChar(c: string): boolean {
-    const code = c.charCodeAt(0)
+const IDENTIFIER_CHARS = new Set(`0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$)]}.'"\``)
 
-    return (
-        (code >= 48 && code <= 57) /* 0-9 */
-        || (code >= 65 && code <= 90) /* A-Z */
-        || (code >= 97 && code <= 122) /* a-z */
-        || c === '_' || c === '$' || c === ')' || c === ']' || c === '}' || c === '.' || c === '\'' || c === '"' || c === '`'
-    )
+function isIdentifierChar(c: string): boolean {
+    return IDENTIFIER_CHARS.has(c)
 }
 
 function isAsciiLetter(c: string): boolean {

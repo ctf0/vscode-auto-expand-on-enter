@@ -218,6 +218,92 @@ ${TAB}{b: 2}
 ])`)
 })
 
+// ── nested function calls ──────────────────────────────────────────
+
+test('expandContent: nested call in chain expands recursively (regression)', () => {
+    const input = 'redirect()->intended(route(DashboardConstants::ROUTE_PARAM, absolute: false));'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `redirect()
+${TAB}->intended(
+${TAB}${TAB}route(
+${TAB}${TAB}${TAB}DashboardConstants::ROUTE_PARAM,
+${TAB}${TAB}${TAB}absolute: false
+${TAB}${TAB})
+${TAB});`)
+})
+
+test('expandContent: nested call in chain with leading indent (regression)', () => {
+    const input = '    redirect()->intended(route(DashboardConstants::ROUTE_PARAM, absolute: false));'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `    redirect()
+${TAB}${TAB}->intended(
+${TAB}${TAB}${TAB}route(
+${TAB}${TAB}${TAB}${TAB}DashboardConstants::ROUTE_PARAM,
+${TAB}${TAB}${TAB}${TAB}absolute: false
+${TAB}${TAB}${TAB})
+${TAB}${TAB});`)
+})
+
+test('expandContent: nested call with single light arg stays on the wrapper line', () => {
+    const input = 'foo(a, bar(b))'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `foo(
+${TAB}a,
+${TAB}bar(b)
+)`)
+})
+
+test('expandContent: nested call as first argument', () => {
+    const input = 'foo(bar(b), a)'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `foo(
+${TAB}bar(b),
+${TAB}a
+)`)
+})
+
+test('expandContent: nested multi-arg call expands both levels', () => {
+    const input = 'foo(a, bar(b, c))'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `foo(
+${TAB}a,
+${TAB}bar(
+${TAB}${TAB}b,
+${TAB}${TAB}c
+${TAB})
+)`)
+})
+
+test('expandContent: deeply nested calls expand level by level', () => {
+    const input = 'foo(bar(baz(1, 2), 3), 4)'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `foo(
+${TAB}bar(
+${TAB}${TAB}baz(
+${TAB}${TAB}${TAB}1,
+${TAB}${TAB}${TAB}2
+${TAB}${TAB}),
+${TAB}${TAB}3
+${TAB}),
+${TAB}4
+)`)
+})
+
+test('expandContent: single-arg nested call that fits stays inline', () => {
+    const input = 'foo(bar(b))'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, 'foo(bar(b))')
+})
+
+test('expandContent: comma before an array does not wrap the call', () => {
+    const input = 'foo(a, [b, c])'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `foo(a, [
+${TAB}b,
+${TAB}c
+])`)
+})
+
 // ── trailing-comma handling ─────────────────────────────────────────
 
 test('expandContent: trailing comma inside array is handled cleanly', () => {
@@ -233,4 +319,32 @@ test('expandContent: trailing comma in call args is never split', () => {
     const input = 'foo(bar,)'
     const result = contentExpand(input, 4, true)
     assert.equal(result, 'foo(bar,)')
+})
+
+// ── bare comma lists (no wrapping parens) ──────────────────────────
+
+test('expandContent: bare comma list expands at the same indent', () => {
+    const input = 'DashboardConstants::ROUTE_PARAM, absolute: false'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `DashboardConstants::ROUTE_PARAM,
+absolute: false`)
+})
+
+test('expandContent: indented bare comma list keeps its indent', () => {
+    const input = '    DashboardConstants::ROUTE_PARAM, absolute: false'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, `    DashboardConstants::ROUTE_PARAM,
+    absolute: false`)
+})
+
+test('expandContent: already-broken list is not double-broken', () => {
+    const input = 'a,\nb'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, 'a,\nb')
+})
+
+test('expandContent: pre-formatted multi-line group stays flat', () => {
+    const input = 'foo(\n    a,\n    b\n)'
+    const result = contentExpand(input, 4, true)
+    assert.equal(result, 'foo(\n    a,\n    b\n)')
 })

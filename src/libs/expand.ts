@@ -3,6 +3,7 @@ import {EOL} from 'os'
 import {contentExpand} from './expandString'
 import {isPositionInNonCode} from './grammar'
 import {extractIndent} from './indent'
+import {SelectionList} from '../shared'
 import {invertSelections} from '../utils'
 import {createBracketSelections} from '../types/brackets'
 import {getTagCharResult, createTagSelections} from '../types/tags'
@@ -181,39 +182,28 @@ export async function expandNewLine(languages: string[], charsList: Record<strin
             }
         }
 
-        if (isSupported) {
-            for (const selection of selections) {
-                const closingTagIndent = getClosingTagIndent(editor.document, selection)
+        if (isSupported && selections.length === 1) {
+            const closingTagIndent = getClosingTagIndent(editor.document, selections[0])
 
-                if (closingTagIndent !== null) {
-                    const {end} = selection
+            if (closingTagIndent !== null) {
+                const {end} = selections[0]
 
-                    await editor.edit(
-                        (edit) => edit.insert(end, EOL + closingTagIndent),
-                        {undoStopBefore: false, undoStopAfter: true},
-                    )
+                await editor.edit(
+                    (edit) => edit.insert(end, EOL + closingTagIndent),
+                    {undoStopBefore: false, undoStopAfter: true},
+                )
 
-                    const line = end.line + 1
-                    const character = closingTagIndent.length
-                    editor.selections = [new vscode.Selection(line, character, line, character)]
+                const line = end.line + 1
+                const character = closingTagIndent.length
+                editor.selections = [new vscode.Selection(line, character, line, character)]
 
-                    return
-                }
+                return
             }
         }
 
-        const {end} = editor.selections[0] ?? selections[selections.length - 1]
-        const fallbackIndent = extractIndent(editor.document.lineAt(end.line).text)
-
-        await editor.edit(
-            (edit) => edit.insert(end, EOL + fallbackIndent),
-            {undoStopBefore: false, undoStopAfter: true},
-        )
-
-        const line = end.line + 1
-        editor.selections = [new vscode.Selection(line, fallbackIndent.length, line, fallbackIndent.length)]
+        await vscode.commands.executeCommand('default:type', {text: EOL})
     } catch {
-        await vscode.commands.executeCommand('type', {text: '\n'})
+        await vscode.commands.executeCommand('default:type', {text: EOL})
     }
 }
 
@@ -245,18 +235,13 @@ function getClosingTagIndent(document: vscode.TextDocument, selection: vscode.Se
     return null
 }
 
-interface SelectionResult extends Array<vscode.Selection> {
-    tagOpeningIndent?  : string
-    _closingIndentKey? : string
-}
-
 async function createSelections(
     editor: vscode.TextEditor,
     selection: vscode.Selection,
     charsList: Record<string, string>,
     open: string[],
     close: string[],
-): Promise<SelectionResult | false> {
+): Promise<SelectionList | false> {
     const {end} = selection
     const {document} = editor
     const {line, character} = end
@@ -277,7 +262,7 @@ async function createSelections(
     const bracketResult = await createBracketSelections(editor, selection, charsList, open, close)
 
     if (bracketResult) {
-        return bracketResult as SelectionResult
+        return bracketResult
     }
 
     return false

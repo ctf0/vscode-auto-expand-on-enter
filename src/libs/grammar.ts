@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import {NonCodeRange, isInsideOffsetRange} from './nonCode'
-import {getLanguageDelimiters, LanguageDelimiters} from './delimiters'
+import {getLanguageDelimiters} from './delimiters'
 
 /* ------------------------------------------------------------------ */
 /*  Non-code range detection                                           */
@@ -20,8 +20,8 @@ export function detectNonCodeRanges(document: vscode.TextDocument): NonCodeRange
     const ranges: NonCodeRange[] = []
     const fullText = document.getText()
 
-    scanForComments(document, fullText, config.multiLineComment, ranges)
-    scanForStrings(document, fullText, config.stringDelimiters, config.templateDelimiters, ranges)
+    scanForComments(fullText, config.multiLineComment, ranges)
+    scanForStrings(fullText, config.stringDelimiters, config.templateDelimiters, ranges)
     scanForSingleLineComments(document, fullText, config.singleLineComment, ranges)
 
     ranges.sort((a, b) => a.startOffset - b.startOffset)
@@ -42,7 +42,6 @@ export function detectNonCodeRanges(document: vscode.TextDocument): NonCodeRange
 }
 
 function scanForComments(
-    document: vscode.TextDocument,
     text: string,
     multiLineComments: [string, string][],
     ranges: NonCodeRange[],
@@ -69,8 +68,24 @@ function scanForComments(
     }
 }
 
+/* Returns the offset just past the first unescaped `close` found at or
+ * after `start`, or -1 when the region is unterminated. */
+function findDelimitedEnd(text: string, start: number, close: string): number {
+    for (let j = start; j < text.length; j++) {
+        if (text[j] === '\\') {
+            j++
+            continue
+        }
+
+        if (text.startsWith(close, j)) {
+            return j + close.length
+        }
+    }
+
+    return -1
+}
+
 function scanForStrings(
-    document: vscode.TextDocument,
     text: string,
     stringDelimiters: string[],
     templateDelimiters: [string, string][],
@@ -87,33 +102,14 @@ function scanForStrings(
                 continue
             }
 
-            const startOffset = i
-            /* Find the matching close, respecting escapes. */
-            let j = i + open.length
+            const end = findDelimitedEnd(text, i + open.length, close)
 
-            while (j < text.length) {
-                if (text[j] === '\\') {
-                    j += 2
-                    continue
-                }
-
-                if (text.startsWith(close, j)) {
-                    const endOffset = j + close.length
-                    ranges.push({
-                        startOffset,
-                        endOffset,
-                        kind : 'template',
-                    })
-                    i = endOffset
-                    break
-                }
-
-                j++
+            if (end === -1) {
+                break /* unterminated: stop scanning this delimiter */
             }
 
-            if (j >= text.length) {
-                break
-            }
+            ranges.push({startOffset: i, endOffset: end, kind: 'template'})
+            i = end
         }
     }
 
@@ -128,35 +124,14 @@ function scanForStrings(
                 continue
             }
 
-            const startOffset = i
-            /* Find the matching close, respecting escapes. */
-            let j = i + 1
+            const end = findDelimitedEnd(text, i + 1, delim)
 
-            while (j < text.length) {
-                if (text[j] === '\\') {
-                    j += 2
-                    continue
-                }
-
-                if (text[j] === delim) {
-                    const endOffset = j + 1
-                    ranges.push({
-                        startOffset,
-                        endOffset,
-                        kind : 'string',
-                    })
-                    i = endOffset
-                    break
-                }
-
-                j++
+            if (end === -1) {
+                break /* unterminated: stop scanning this delimiter */
             }
 
-            if (j >= text.length) {
-                break
-            }
-
-            i++
+            ranges.push({startOffset: i, endOffset: end, kind: 'string'})
+            i = end + 1 /* never re-match the closing quote as an opener */
         }
     }
 }

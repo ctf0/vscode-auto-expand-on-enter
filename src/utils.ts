@@ -31,17 +31,11 @@ export function getLanguages(): string[] {
 }
 
 export function invertSelections(arr: readonly vscode.Selection[]): vscode.Selection[] {
-    return [...arr]
-        .sort((a, b) => {
-            const lineDiff = a.start.line - b.start.line
-
-            if (lineDiff !== 0) {
-                return lineDiff
-            }
-
-            return a.start.character - b.start.character
-        })
-        .reverse()
+    return [...arr].sort((a, b) =>
+        b.start.line !== a.start.line
+            ? b.start.line - a.start.line
+            : b.start.character - a.start.character,
+    )
 }
 
 export function readConfig() {

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import {extractIndent} from '../libs/indent'
+import {SelectionList} from '../shared'
 
 let cachedSymbols: vscode.DocumentSymbol[] | undefined
 let cachedUri = ''
@@ -9,11 +10,6 @@ interface TagResult {
     tagName   : string
     symbol    : vscode.DocumentSymbol
     direction : 'toLeft' | 'toRight'
-}
-
-interface TagSelectionResult extends Array<vscode.Selection> {
-    tagOpeningIndent?  : string
-    _closingIndentKey? : string
 }
 
 export async function getTagCharResult(document: vscode.TextDocument, end: vscode.Position): Promise<TagResult | null> {
@@ -80,9 +76,9 @@ export function createTagSelections(
     editor: vscode.TextEditor,
     selection: vscode.Selection,
     tagResult: TagResult,
-    _before: string,
-    _after: string,
-): TagSelectionResult | false {
+    before: string,
+    after: string,
+): SelectionList | false {
     const {end} = selection
     const {document} = editor
     const {direction, symbol} = tagResult
@@ -91,7 +87,7 @@ export function createTagSelections(
     const tagIndent = extractIndent(tagLineText)
 
     if (direction === 'toRight') {
-        if (!_after) {
+        if (!after) {
             return false
         }
 
@@ -102,7 +98,7 @@ export function createTagSelections(
             return false
         }
 
-        const result: TagSelectionResult = [
+        const result: SelectionList = [
             new vscode.Selection(end, end),
             new vscode.Selection(closeTagPos, closeTagPos),
         ]
@@ -113,7 +109,7 @@ export function createTagSelections(
         return result
     }
 
-    if (!_before) {
+    if (!before) {
         return false
     }
 
@@ -124,7 +120,7 @@ export function createTagSelections(
         return false
     }
 
-    const result: TagSelectionResult = [
+    const result: SelectionList = [
         new vscode.Selection(end, end),
         new vscode.Selection(openTagEnd, openTagEnd),
     ]

@@ -71,91 +71,86 @@ function isJsLike(languageId) {
     return JS_LIKE.has(languageId)
 }
 
+var templateGroups = [
+    {ids: JS_LIKE, template: [['`', '`']]},
+    {ids: TEMPLATE_LIKE, template: [['{{', '}}']]},
+]
+var plainGroups = [
+    {ids: C_LIKE, delimiters: cStyleDelimiters},
+    {ids: HASH_LIKE, delimiters: hashDelimiters},
+    {ids: SHELL_LIKE, delimiters: cStyleDelimiters},
+]
+var pythonDelimiters = {
+    singleLineComment  : ['#'],
+    multiLineComment   : [['"""', '"""'], ['\'\'\'', '\'\'\'']],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+var sqlDelimiters = {
+    singleLineComment  : ['--'],
+    multiLineComment   : [['/*', '*/']],
+    stringDelimiters   : ['\'', '"'],
+    templateDelimiters : [],
+}
+var luaDelimiters = {
+    singleLineComment  : ['--'],
+    multiLineComment   : [['--[[', ']]']],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+var markupDelimiters = {
+    singleLineComment  : [],
+    multiLineComment   : [],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+var svelteDelimiters = {
+    singleLineComment  : [],
+    multiLineComment   : [['<!--', '-->']],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+var fortranDelimiters = {
+    singleLineComment  : ['!', 'c', 'C'],
+    multiLineComment   : [],
+    stringDelimiters   : ['"', '\''],
+    templateDelimiters : [],
+}
+var languageOverrides = {
+    php     : slashHashDelimiters,
+    python  : pythonDelimiters,
+    sql     : sqlDelimiters,
+    lua     : luaDelimiters,
+    svelte  : svelteDelimiters,
+    fortran : fortranDelimiters,
+    clojure : {singleLineComment: [';'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []},
+    cobol   : {singleLineComment: ['*'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []},
+}
+
 function getLanguageDelimiters(languageId) {
-    if (JS_LIKE.has(languageId)) {
-        return {...cStyleDelimiters, templateDelimiters: [['`', '`']]}
-    }
-
-    if (TEMPLATE_LIKE.has(languageId)) {
-        return {...cStyleDelimiters, templateDelimiters: [['{{', '}}']]}
-    }
-
-    if (languageId === 'php') {
-        return slashHashDelimiters
-    }
-
-    if (languageId === 'python') {
-        return {
-            singleLineComment  : ['#'],
-            multiLineComment   : [['"""', '"""'], ['\'\'\'', '\'\'\'']],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
+    for (const {ids, template} of templateGroups) {
+        if (ids.has(languageId)) {
+            return {...cStyleDelimiters, templateDelimiters: template}
         }
     }
 
-    if (C_LIKE.has(languageId)) {
-        return cStyleDelimiters
+    const override = languageOverrides[languageId]
+
+    if (override) {
+        return override
     }
 
-    if (HASH_LIKE.has(languageId)) {
-        return hashDelimiters
-    }
-
-    if (SHELL_LIKE.has(languageId)) {
-        return cStyleDelimiters
-    }
-
-    if (languageId === 'sql') {
-        return {
-            singleLineComment  : ['--'],
-            multiLineComment   : [['/*', '*/']],
-            stringDelimiters   : ['\'', '"'],
-            templateDelimiters : [],
-        }
-    }
-
-    if (languageId === 'lua') {
-        return {
-            singleLineComment  : ['--'],
-            multiLineComment   : [['--[[', ']]']],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
+    for (const {ids, delimiters} of plainGroups) {
+        if (ids.has(languageId)) {
+            return delimiters
         }
     }
 
     if (MARKUP_LIKE.has(languageId)) {
         return {
-            singleLineComment  : [],
-            multiLineComment   : HTML_COMMENT_LIKE.has(languageId) ? [['<!--', '-->']] : [],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
+            ...markupDelimiters,
+            multiLineComment : HTML_COMMENT_LIKE.has(languageId) ? [['<!--', '-->']] : [],
         }
-    }
-
-    if (languageId === 'svelte') {
-        return {
-            singleLineComment  : [],
-            multiLineComment   : [['<!--', '-->']],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
-        }
-    }
-
-    if (languageId === 'fortran') {
-        return {
-            singleLineComment  : ['!', 'c', 'C'],
-            multiLineComment   : [],
-            stringDelimiters   : ['"', '\''],
-            templateDelimiters : [],
-        }
-    }
-
-    if (languageId === 'clojure') {
-        return {singleLineComment: [';'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []}
-    }
-
-    if (languageId === 'cobol') {
-        return {singleLineComment: ['*'], multiLineComment: [], stringDelimiters: ['"', '\''], templateDelimiters: []}
     }
 
     return defaultDelimiters
@@ -318,10 +313,10 @@ function scanSingleLineComments(text, markers, ranges) {
     }
 }
 
-function isIdentifierChar(c) {
-    const code = c.charCodeAt(0)
+var IDENTIFIER_CHARS = new Set(`0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$)]}.'"\``)
 
-    return code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122 || c === '_' || c === '$' || c === ')' || c === ']' || c === '}' || c === '.' || c === '\'' || c === '"' || c === '`'
+function isIdentifierChar(c) {
+    return IDENTIFIER_CHARS.has(c)
 }
 
 function isAsciiLetter(c) {
@@ -522,46 +517,206 @@ function splitTopLevel(text, separator) {
 }
 
 function expandFunctionArguments(txt, indentUnit) {
-    return txt.replace(/(?<=['"\S])([\t ]+)?,(?![\t ]*[)\]\}])([\t ]+)?['"\S]/g, (match, off, _afterWs, offset, str) => {
-        if (match[match.length - 1] === '[') {
-            return match
+    return formatCallGroups(txt, indentUnit)
+}
+
+function formatCallGroups(txt, indentUnit) {
+    let out = ''
+    let i = 0
+    let arrayDepth = 0
+    let braceDepth = 0
+
+    while (i < txt.length) {
+        const c = txt[i]
+
+        if (c === '[') {
+            arrayDepth++
+        } else if (c === ']') {
+            arrayDepth = Math.max(0, arrayDepth - 1)
+        } else if (c === '{') {
+            braceDepth++
+        } else if (c === '}') {
+            braceDepth = Math.max(0, braceDepth - 1)
         }
 
-        let bracketDepth = 0
-        let arrayDepth = 0
+        if (arrayDepth > 0 || c !== '(') {
+            if (c === ',' && arrayDepth === 0 && !isCommaGuard(txt, i)) {
+                const lineStart2 = txt.lastIndexOf('\n', i) + 1
+                const lineIndent = extractIndent(txt.slice(lineStart2, i))
+                const indent = braceDepth > 0 ? lineIndent + indentUnit : lineIndent
+                out += ',' + import_os.EOL + indent
+                i++
 
-        for (let i = 0; i < offset; i++) {
-            if (str[i] === '[') {
-                arrayDepth++
-            } else if (str[i] === ']') {
-                arrayDepth--
-            } else if (str[i] === '(' || str[i] === '{') {
-                bracketDepth++
-            } else if (str[i] === ')' || str[i] === '}') {
-                bracketDepth--
+                while (i < txt.length && (txt[i] === ' ' || txt[i] === '	')) {
+                    i++
+                }
+
+                continue
+            }
+
+            out += c
+            i++
+            continue
+        }
+
+        const close = findMatchingParen(txt, i)
+
+        if (close === -1) {
+            out += txt.slice(i)
+            break
+        }
+
+        const inner = txt.slice(i + 1, close)
+        const lineStart = txt.lastIndexOf('\n', i) + 1
+        const baseIndent = extractIndent(txt.slice(lineStart, i))
+
+        if (!needsBreak(inner)) {
+            out += '(' + formatCallGroups(inner, indentUnit) + ')'
+        } else {
+            const parts = splitCallParts(inner)
+            const contentIndent = baseIndent + indentUnit
+            out += '('
+
+            for (let p = 0; p < parts.length; p++) {
+                out += (p > 0 ? ',' : '') + import_os.EOL + pushPart(formatCallGroups(parts[p], indentUnit), contentIndent)
+            }
+
+            out += import_os.EOL + baseIndent + ')'
+        }
+
+        i = close + 1
+    }
+
+    return out
+}
+
+function findMatchingParen(text, open) {
+    let depth = 0
+
+    for (let j = open; j < text.length; j++) {
+        if (text[j] === '(') {
+            depth++
+        } else if (text[j] === ')') {
+            depth--
+
+            if (depth === 0) {
+                return j
             }
         }
+    }
 
-        if (arrayDepth > 0) {
-            return match
+    return -1
+}
+
+function needsBreak(inner) {
+    let arrayDepth = 0
+
+    for (let i = 0; i < inner.length; i++) {
+        const c = inner[i]
+
+        if (c === '[') {
+            arrayDepth++
+        } else if (c === ']') {
+            arrayDepth = Math.max(0, arrayDepth - 1)
+        } else if (arrayDepth === 0) {
+            if (c === '\n') {
+                return true
+            }
+
+            if (c === ',' && !isCommaGuard(inner, i)) {
+                return true
+            }
+
+            if (c === '(') {
+                const close = findMatchingParen(inner, i)
+
+                if (close !== -1) {
+                    if (needsBreak(inner.slice(i + 1, close))) {
+                        return true
+                    }
+
+                    i = close
+                }
+            }
         }
+    }
 
-        const lineStart = str.lastIndexOf('\n', offset) + 1
-        const linePrefix = str.slice(lineStart, offset)
-        const lineIndent = extractIndent(linePrefix)
-        const indent = bracketDepth > 0 ? lineIndent + indentUnit : lineIndent
+    return false
+}
 
-        return match.replace(/,[\t ]*/, `,${import_os.EOL}${indent}`)
-    }).replace(/\(([^)\[\]]*\n[^)\[\]]*)\)/g, (match, inner, offset, str) => {
-        const beforeParen = str.slice(0, offset)
-        const lineStart = beforeParen.lastIndexOf('\n') + 1
-        const lineIndent = extractIndent(beforeParen.slice(lineStart))
-        const contentIndent = lineIndent + indentUnit
+function isCommaGuard(text, commaIndex) {
+    let j = commaIndex + 1
 
-        return `(
-${contentIndent}${inner}
-${lineIndent})`
-    })
+    while (j < text.length && (text[j] === ' ' || text[j] === '	')) {
+        j++
+    }
+
+    return j >= text.length || text[j] === ')' || text[j] === ']' || text[j] === '}' || text[j] === '[' || text[j] === '\n' || text[j] === '\r'
+}
+
+function splitCallParts(inner) {
+    const parts = []
+    let depth = 0
+    let start = 0
+
+    for (let i = 0; i < inner.length; i++) {
+        const c = inner[i]
+
+        if (c === '(' || c === '[' || c === '{') {
+            depth++
+        } else if (c === ')' || c === ']' || c === '}') {
+            depth = Math.max(0, depth - 1)
+        } else if (c === ',' && depth === 0 && !isCommaGuard(inner, i)) {
+            parts.push(inner.slice(start, i).trim())
+            start = i + 1
+        }
+    }
+
+    parts.push(inner.slice(start).trim())
+
+    return parts.filter((part) => part !== '')
+}
+
+function pushPart(part, indent) {
+    const lines = part.split('\n')
+    const first = lines[0] ?? ''
+    const anchor = extractIndent(first)
+    let out = indent + first
+    let parenDepth = 0
+    let arrayDepth = 0
+
+    for (const c of first) {
+        if (c === '(') {
+            parenDepth++
+        } else if (c === ')') {
+            parenDepth = Math.max(0, parenDepth - 1)
+        } else if (c === '[') {
+            arrayDepth++
+        } else if (c === ']') {
+            arrayDepth = Math.max(0, arrayDepth - 1)
+        }
+    }
+
+    for (let k = 1; k < lines.length; k++) {
+        const line = lines[k]
+        const origIndent = extractIndent(line)
+        const indentToUse = parenDepth > 0 || arrayDepth > 0 ? indent + origIndent.slice(anchor.length) : indent
+        out += import_os.EOL + indentToUse + line.slice(origIndent.length)
+
+        for (const c of line) {
+            if (c === '(') {
+                parenDepth++
+            } else if (c === ')') {
+                parenDepth = Math.max(0, parenDepth - 1)
+            } else if (c === '[') {
+                arrayDepth++
+            } else if (c === ']') {
+                arrayDepth = Math.max(0, arrayDepth - 1)
+            }
+        }
+    }
+
+    return out
 }
 
 function contentExpand(txt, tabSize, insertSpaces, languageId) {
@@ -757,6 +912,82 @@ ${TAB}{a: 1},
 ${TAB}{b: 2}
 ])`)
 });
+(0, import_node_test.default)('expandContent: nested call in chain expands recursively (regression)', () => {
+    const input = 'redirect()->intended(route(DashboardConstants::ROUTE_PARAM, absolute: false));'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `redirect()
+${TAB}->intended(
+${TAB}${TAB}route(
+${TAB}${TAB}${TAB}DashboardConstants::ROUTE_PARAM,
+${TAB}${TAB}${TAB}absolute: false
+${TAB}${TAB})
+${TAB});`)
+});
+(0, import_node_test.default)('expandContent: nested call in chain with leading indent (regression)', () => {
+    const input = '    redirect()->intended(route(DashboardConstants::ROUTE_PARAM, absolute: false));'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `    redirect()
+${TAB}${TAB}->intended(
+${TAB}${TAB}${TAB}route(
+${TAB}${TAB}${TAB}${TAB}DashboardConstants::ROUTE_PARAM,
+${TAB}${TAB}${TAB}${TAB}absolute: false
+${TAB}${TAB}${TAB})
+${TAB}${TAB});`)
+});
+(0, import_node_test.default)('expandContent: nested call with single light arg stays on the wrapper line', () => {
+    const input = 'foo(a, bar(b))'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `foo(
+${TAB}a,
+${TAB}bar(b)
+)`)
+});
+(0, import_node_test.default)('expandContent: nested call as first argument', () => {
+    const input = 'foo(bar(b), a)'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `foo(
+${TAB}bar(b),
+${TAB}a
+)`)
+});
+(0, import_node_test.default)('expandContent: nested multi-arg call expands both levels', () => {
+    const input = 'foo(a, bar(b, c))'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `foo(
+${TAB}a,
+${TAB}bar(
+${TAB}${TAB}b,
+${TAB}${TAB}c
+${TAB})
+)`)
+});
+(0, import_node_test.default)('expandContent: deeply nested calls expand level by level', () => {
+    const input = 'foo(bar(baz(1, 2), 3), 4)'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `foo(
+${TAB}bar(
+${TAB}${TAB}baz(
+${TAB}${TAB}${TAB}1,
+${TAB}${TAB}${TAB}2
+${TAB}${TAB}),
+${TAB}${TAB}3
+${TAB}),
+${TAB}4
+)`)
+});
+(0, import_node_test.default)('expandContent: single-arg nested call that fits stays inline', () => {
+    const input = 'foo(bar(b))'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, 'foo(bar(b))')
+});
+(0, import_node_test.default)('expandContent: comma before an array does not wrap the call', () => {
+    const input = 'foo(a, [b, c])'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `foo(a, [
+${TAB}b,
+${TAB}c
+])`)
+});
 (0, import_node_test.default)('expandContent: trailing comma inside array is handled cleanly', () => {
     const input = 'foo([a, b,])'
     const result = contentExpand(input, 4, true)
@@ -769,4 +1000,26 @@ ${TAB}b
     const input = 'foo(bar,)'
     const result = contentExpand(input, 4, true)
     import_strict.default.equal(result, 'foo(bar,)')
+});
+(0, import_node_test.default)('expandContent: bare comma list expands at the same indent', () => {
+    const input = 'DashboardConstants::ROUTE_PARAM, absolute: false'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `DashboardConstants::ROUTE_PARAM,
+absolute: false`)
+});
+(0, import_node_test.default)('expandContent: indented bare comma list keeps its indent', () => {
+    const input = '    DashboardConstants::ROUTE_PARAM, absolute: false'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, `    DashboardConstants::ROUTE_PARAM,
+    absolute: false`)
+});
+(0, import_node_test.default)('expandContent: already-broken list is not double-broken', () => {
+    const input = 'a,\nb'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, 'a,\nb')
+});
+(0, import_node_test.default)('expandContent: pre-formatted multi-line group stays flat', () => {
+    const input = 'foo(\n    a,\n    b\n)'
+    const result = contentExpand(input, 4, true)
+    import_strict.default.equal(result, 'foo(\n    a,\n    b\n)')
 })

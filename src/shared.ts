@@ -1,5 +1,10 @@
 import * as vscode from 'vscode'
 
+export interface SelectionList extends Array<vscode.Selection> {
+    tagOpeningIndent?  : string
+    _closingIndentKey? : string
+}
+
 export function getText(direction: 'toLeft' | 'toRight', document: vscode.TextDocument, position: vscode.Position, length: number): string {
     const {line, character} = position
 
